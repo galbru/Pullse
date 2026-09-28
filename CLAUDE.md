@@ -16,6 +16,7 @@ make check     # build, then one live read-only fetch: prints what the last 24h 
 make test      # swift test
 make demo      # render docs/demo/*.gif (notifications, Settings tour, update) from sample data
 make dist      # build + zip: build/Pullse-<version>.zip and .sha256 (scripts/package.sh)
+make stats     # read-only download counts per release (manual vs in-app updates), plus repo traffic
 scripts/next-version.sh     # the version the [Unreleased] notes would release as, or exit 1
 scripts/test.sh --filter <testFunctionName>   # a single test (Swift Testing, not XCTest)
 swift build    # debug build; enough to type-check the app target

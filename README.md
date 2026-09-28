@@ -117,6 +117,7 @@ make check     # one live fetch: print what the last 24h would have notified abo
 make test      # unit tests
 make demo      # re-render the animated GIFs in docs/demo from the same sample data
 make dist      # build, then zip it as build/Pullse-<version>.zip with a .sha256
+make stats     # download counts per release, and the repo's traffic (read-only)
 ```
 
 The first time it launches, macOS asks to allow notifications. If you miss that prompt,
@@ -227,6 +228,14 @@ top of the merge. If two merges land close together, the later run releases both
 To pick a version yourself, such as 1.0.0 or a prerelease like `1.1.0-beta.1`, run the
 workflow by hand: Actions → Release → Run workflow, with the version filled in. Prereleases
 are marked as such on GitHub.
+
+### Download counts
+
+`make stats` (`scripts/stats.sh`) reads GitHub's download counters for every release. Only
+the in-app updater fetches a release's `.sha256`, so its count is the number of in-app
+updates, and what the `.zip` has on top of that is manual downloads. It also shows the
+repository's views and clones over the last 14 days (that part needs push access).
+Installs themselves aren't counted: Pullse sends nothing anywhere.
 
 ### CI
 

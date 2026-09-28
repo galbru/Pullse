@@ -1,7 +1,7 @@
 APP := build/Pullse.app
 INSTALLED := $(HOME)/Applications/Pullse.app
 
-.PHONY: build test run check demo dist install uninstall clean
+.PHONY: build test run check demo dist stats install uninstall clean
 
 build:
 	scripts/build-app.sh
@@ -29,6 +29,10 @@ demo: build
 # Zip the app with its SHA-256 for download: build/Pullse-<version>.zip(.sha256).
 dist: build
 	scripts/package.sh
+
+# Read-only download counts per release (manual downloads vs in-app updates), plus traffic.
+stats:
+	scripts/stats.sh
 
 install: build
 	mkdir -p "$(HOME)/Applications"
