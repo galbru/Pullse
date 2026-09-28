@@ -2,6 +2,7 @@
 
 [![Build](../../actions/workflows/release.yml/badge.svg?branch=main)](../../actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/badge/release-v0.8.1-blue)](../../releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/galbru/Pullse/total?label=downloads)](../../releases)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 A macOS menu bar app that sends a native notification when something happens on your
@@ -236,6 +237,9 @@ the in-app updater fetches a release's `.sha256`, so its count is the number of 
 updates, and what the `.zip` has on top of that is manual downloads. It also shows the
 repository's views and clones over the last 14 days (that part needs push access).
 Installs themselves aren't counted: Pullse sends nothing anywhere.
+
+The downloads badge at the top is shields.io's live total of every release file, so an
+in-app update counts twice (the `.zip` and its `.sha256`). `make stats` has the split.
 
 ### CI
 
