@@ -1,0 +1,12 @@
+# Opens a pull request when an action used by the workflows has a new release, updating
+# its pinned commit SHA and the version comment beside it. Pullse has no package
+# dependencies, so GitHub Actions is the only ecosystem to watch.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

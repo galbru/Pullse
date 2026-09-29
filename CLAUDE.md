@@ -130,7 +130,9 @@ artifact. Pushes made with `GITHUB_TOKEN` don't trigger workflows, so there is n
 tag push triggers nothing, so a version cut and tagged locally would never be published.
 Both workflows run on `macos-26`, and actions are pinned by commit SHA. The repository
 allows only GitHub-owned actions and requires SHA pinning, so a new action must be
-GitHub's own and pinned. Releases are immutable once published: assets and tag can't be
+GitHub's own and pinned. Dependabot (`.github/dependabot.yml`) opens a weekly PR
+when a pinned action has a new release; it needs no changelog line, since nothing
+user-visible changes. Secret scanning with push protection is on. Releases are immutable once published: assets and tag can't be
 changed, so a bad release is fixed by releasing a new version. The bundle id comes from the
 `BUNDLE_ID` repository variable. The repo is public.
 
