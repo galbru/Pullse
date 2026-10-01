@@ -16,7 +16,10 @@ GitHub pull requests in an organization you choose:
 You can turn each of these on or off, and bots (github-actions, Terraform plan bots,
 dependabot, …) are muted by default. Clicking a notification opens the comment, review or
 check. The menu bar icon shows an unread count, and its popover lists recent activity
-grouped by PR. Right-click the icon for About (the GitHub repository), Settings and Quit.
+grouped by PR. Turn on **Show open pull requests in the menu** (Settings → Notifications)
+to also list every open PR you authored, with its CI and review status, even when nothing
+new has happened on it. Right-click the icon for About (the GitHub repository), Settings
+and Quit.
 
 ## See it in action
 
@@ -25,7 +28,7 @@ notification, the menu bar count goes up, and the menu lists it with an unread d
 grouped by pull request. Clicking a notification or a row opens it on GitHub.
 
 <p align="center">
-  <img src="docs/demo/demo-notify.gif" width="760" alt="Two Pullse notifications arrive, a failed CI run and a review requesting changes; the menu bar count goes to 2, and clicking the icon opens the activity list with both marked unread">
+  <img src="docs/demo/demo-notify.gif" width="760" alt="Two Pullse notifications arrive, a failed CI run and a review requesting changes; the menu bar count goes to 2, and clicking the icon opens the activity list with both marked unread, each open PR showing its CI and review status">
 </p>
 
 **Choose what you hear about.** Settings has a tab per area: the organization and how
@@ -156,6 +159,7 @@ edits it, and changes made by hand are picked up on the next check.
   "ciResults": "failuresOnly",
   "includeBots": false,
   "mutedRepos": ["sandbox", "your-org/legacy-app"],
+  "showOpenPullRequests": false,
   "checkForUpdates": true,
   "autoUpdate": false,
   "includePrereleases": false,

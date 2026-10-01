@@ -66,6 +66,9 @@ Two targets. `PullseCore` has no AppKit or SwiftUI and holds all the logic under
 4. `PersistedState.record` adds the events to history. `StateStore` saves it to
    `~/Library/Application Support/Pullse/state.json`, and `Notifier` posts the
    notifications. More than 5 events at once become one summary notification.
+5. The same snapshot gives `AppModel.openPRs` (`OpenPullRequest`: draft, review decision,
+   rollup state), kept in memory only. With `showOpenPullRequests` on, the menu's
+   `ActivityGroups.build` adds the open PRs with no activity after the active groups.
 
 **What counts as new** is the heart of the app (`EventDetector`). An item notifies only if
 its id is not in the seen set **and** its timestamp is at or after `lastPollAt − 5 min`. The

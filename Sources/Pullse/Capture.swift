@@ -66,6 +66,7 @@ enum Capture {
         var settings = PullseSettings()
         settings.org = "acme"
         settings.mutedRepos = ["sandbox"]
+        settings.showOpenPullRequests = true
         let settingsFile = SettingsFile(url: dir.appendingPathComponent("settings.json"))
         try settingsFile.save(settings)
 
@@ -77,7 +78,7 @@ enum Capture {
         let model = AppModel(store: store, settings: SettingsModel(
             file: settingsFile, displayPath: "~/.config/pullse/settings.json"
         ))
-        model.showAsPolled(openPullRequests: 4, at: Date().addingTimeInterval(-20))
+        model.showAsPolled(openPRs: sampleOpenPRs(now: Date()), at: Date().addingTimeInterval(-20))
         let asset = { (id: Int, name: String) in
             ReleaseAsset(id: id, name: name, url: "https://api.github.com/assets/\(id)", size: 0)
         }
@@ -91,6 +92,28 @@ enum Capture {
             )
         }
         return model
+    }
+
+    /// The sample user's open PRs: two with activity in `sampleEvents`, one without.
+    static func sampleOpenPRs(now: Date) -> [OpenPullRequest] {
+        func pr(_ repo: String, _ number: Int, _ title: String, daysAgo: Double,
+                draft: Bool = false, ci: OpenPullRequest.CIState?,
+                review: OpenPullRequest.ReviewState?) -> OpenPullRequest {
+            OpenPullRequest(
+                repo: repo, number: number, title: title,
+                url: "https://github.com/\(repo)/pull/\(number)",
+                createdAt: now.addingTimeInterval(-daysAgo * 86_400),
+                isDraft: draft, ci: ci, review: review
+            )
+        }
+        return [
+            pr("acme/api", 412, "Add rate limiting to the public API", daysAgo: 3,
+               ci: .failing, review: .changesRequested),
+            pr("acme/web", 88, "Dark mode for the dashboard", daysAgo: 5,
+               ci: .passing, review: .approved),
+            pr("acme/cli", 57, "Add a --json flag to status", daysAgo: 0.1,
+               draft: true, ci: .running, review: .required),
+        ]
     }
 
     static func sampleEvents(now: Date) -> [PREvent] {

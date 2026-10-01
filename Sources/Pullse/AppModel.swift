@@ -7,6 +7,8 @@ import PullseCore
 final class AppModel {
     private(set) var history: [PREvent] = []
     private(set) var openPullRequests = 0
+    /// From the latest poll; not saved, so empty until the first poll after launch.
+    private(set) var openPRs: [OpenPullRequest] = []
     private(set) var lastPoll: Date?
     private(set) var lastError: String?
     private(set) var isPolling = false
@@ -42,8 +44,9 @@ final class AppModel {
     }
 
     /// Demo GIFs only: show a finished poll without talking to GitHub.
-    func showAsPolled(openPullRequests: Int, at date: Date) {
-        self.openPullRequests = openPullRequests
+    func showAsPolled(openPRs: [OpenPullRequest], at date: Date) {
+        self.openPRs = openPRs
+        openPullRequests = openPRs.count
         lastPoll = date
         lastError = nil
     }
@@ -129,6 +132,7 @@ final class AppModel {
             state.record(events)
             history = state.history
             openPullRequests = snapshot.myPullRequests.count
+            openPRs = snapshot.myPullRequests.map(OpenPullRequest.init)
             lastPoll = Date()
             lastError = nil
             save()
@@ -169,6 +173,13 @@ final class AppModel {
                 print("Updates: \(update.version.description) is available (\(update.pageURL))")
             } else {
                 print("Updates: \(updater.version) is up to date (\(updater.repository ?? "no update source"))")
+            }
+            print("Open PRs:")
+            for pr in snapshot.myPullRequests.map(OpenPullRequest.init) {
+                let status = [
+                    pr.ci.map { "CI \($0)" }, pr.isDraft ? "draft" : pr.review.map { "review \($0)" },
+                ].compactMap { $0 }
+                print("  \(pr.prLabel)  \(pr.title.prefix(50))  \(status.isEmpty ? "-" : status.joined(separator: ", "))")
             }
             print("\(events.count) events in the last 24h:")
             for event in events {
@@ -240,6 +251,13 @@ final class AppModel {
         }
         // History may predate the link check, so check again right before opening.
         if let link = GitHubLink.safe(event.url, fallback: event.prURL), let url = URL(string: link) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// A group header in the menu: the pull request itself.
+    func openPullRequest(_ prURL: String) {
+        if let link = GitHubLink.safe(prURL), let url = URL(string: link) {
             NSWorkspace.shared.open(url)
         }
     }

@@ -153,6 +153,14 @@ struct SettingsView: View {
             }
         }
 
+        Section {
+            Toggle("Show open pull requests in the menu", isOn: settings.binding(\.showOpenPullRequests))
+        } header: {
+            Text("Menu")
+        } footer: {
+            Footnote("Lists every open pull request you authored, with its CI and review status, even when there's no new activity on it.")
+        }
+
         Section("Notify me about") {
             Toggle("Comments on my pull requests", isOn: settings.binding(\.notifyComments))
             Toggle("Reviews on my pull requests", isOn: settings.binding(\.notifyReviews))

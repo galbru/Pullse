@@ -23,8 +23,9 @@ enum Queries {
     }
     """
 
-    /// Every open PR I authored in the org, with its conversation and the check
-    /// rollup of its head commit — one request no matter how many repos or PRs.
+    /// Every open PR I authored in the org, with its conversation, its draft and review
+    /// status, and the check rollup of its head commit — one request no matter how many
+    /// repos or PRs.
     static let myPullRequests = """
     query($q: String!) {
       viewer { login }
@@ -32,10 +33,12 @@ enum Queries {
         nodes {
           ... on PullRequest {
             ...ConversationFields
+            isDraft reviewDecision
             commits(last: 1) {
               nodes {
                 commit {
                   statusCheckRollup {
+                    state
                     contexts(first: 100) {
                       nodes {
                         __typename

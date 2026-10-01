@@ -45,19 +45,24 @@ func pr(
     repo: String = "acme/api", number: Int = 1, body: String = "",
     author: [String: Any] = actor("me"),
     comments: [[String: Any]] = [], reviews: [[String: Any]] = [],
-    threads: [[[String: Any]]] = [], checks: [[String: Any]] = []
+    threads: [[[String: Any]]] = [], checks: [[String: Any]] = [],
+    isDraft: Bool = false, reviewDecision: String? = nil, rollupState: String? = nil,
+    createdAt: Date = t0.addingTimeInterval(-86_400)
 ) -> [String: Any] {
     [
         "id": "PR_\(repo)_\(number)", "number": number, "title": "A change",
+        "isDraft": isDraft, "reviewDecision": reviewDecision ?? NSNull(),
         "url": "https://github.com/\(repo)/pull/\(number)", "body": body,
-        "createdAt": stamp(t0.addingTimeInterval(-86_400)), "author": author,
+        "createdAt": stamp(createdAt), "author": author,
         "repository": ["nameWithOwner": repo],
         "comments": ["nodes": comments],
         // Inline comments arrive nested in the (empty "commented") review that holds them.
         "reviews": ["nodes": reviews + threads.enumerated().map { index, comments in
             review("rv\(index)", state: "COMMENTED", comments: comments)
         }],
-        "commits": ["nodes": [["commit": ["statusCheckRollup": ["contexts": ["nodes": checks]]]]]],
+        "commits": ["nodes": [["commit": ["statusCheckRollup": [
+            "state": rollupState.map { $0 as Any } ?? NSNull(), "contexts": ["nodes": checks],
+        ]]]]],
     ]
 }
 

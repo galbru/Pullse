@@ -8,6 +8,14 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Added
+- "Show open pull requests in the menu" in Settings → Notifications lists every open pull
+  request you authored, with its CI and review status, even when there's no new activity
+  on it. Clicking a pull request's heading in the menu opens it.
+
+### Fixed
+- The menu no longer opens with a gap under the menu bar after its list gets shorter.
+
 ## [0.8.1] - 2026-09-28
 
 ### Security

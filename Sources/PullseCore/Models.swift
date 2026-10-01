@@ -97,6 +97,9 @@ public struct CheckContext: Decodable, Sendable {
 }
 
 public struct StatusCheckRollup: Decodable, Sendable {
+    /// The head commit's combined result: SUCCESS, FAILURE, ERROR, PENDING or EXPECTED.
+    /// Only requested for my own PRs.
+    public var state: String? = nil
     public let contexts: Connection<CheckContext>
 }
 
@@ -129,6 +132,10 @@ public struct PullRequest: Decodable, Sendable {
     public let reviews: Connection<Review>
     /// Only requested for my own PRs (CI results); absent in the mentions query.
     public let commits: Connection<CommitNode>?
+    /// Only requested for my own PRs, for the open-PR list in the menu.
+    public var isDraft: Bool? = nil
+    /// APPROVED, CHANGES_REQUESTED or REVIEW_REQUIRED; null when no review is required.
+    public var reviewDecision: String? = nil
 
     public var checks: [CheckContext] {
         commits?.items.last?.commit.statusCheckRollup?.contexts.items ?? []

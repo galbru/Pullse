@@ -14,6 +14,9 @@ public struct PullseSettings: Codable, Equatable, Sendable {
     public var ciResults: DetectorSettings.CIMode = .failuresOnly
     public var includeBots = false
     public var mutedRepos: [String] = []
+    /// List every open PR of mine in the menu, with its CI and review status, even when
+    /// it has no new activity.
+    public var showOpenPullRequests = false
     /// Look for new releases (on launch and every hour) and show when one exists.
     public var checkForUpdates = true
     /// Install a new release once it's found and Pullse isn't in use, then relaunch.
@@ -43,6 +46,7 @@ public struct PullseSettings: Codable, Equatable, Sendable {
         ciResults = try c.decodeIfPresent(DetectorSettings.CIMode.self, forKey: .ciResults) ?? d.ciResults
         includeBots = try c.decodeIfPresent(Bool.self, forKey: .includeBots) ?? d.includeBots
         mutedRepos = try c.decodeIfPresent([String].self, forKey: .mutedRepos) ?? d.mutedRepos
+        showOpenPullRequests = try c.decodeIfPresent(Bool.self, forKey: .showOpenPullRequests) ?? d.showOpenPullRequests
         checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? d.checkForUpdates
         autoUpdate = try c.decodeIfPresent(Bool.self, forKey: .autoUpdate) ?? d.autoUpdate
         includePrereleases = try c.decodeIfPresent(Bool.self, forKey: .includePrereleases) ?? d.includePrereleases

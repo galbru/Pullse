@@ -9,6 +9,8 @@ struct MenuView: View {
     /// Plain `State`, see EventRow.
     private let listHeight = State<CGFloat>(initialValue: 0)
     private let maxListHeight: CGFloat = 440
+    /// Height of the whole menu, for `FitWindowToContent`. Plain `State`, see EventRow.
+    private let contentHeight = State<CGFloat>(initialValue: 0)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -22,13 +24,20 @@ struct MenuView: View {
                 UpdateBanner(updater: model.updater)
                 Divider()
             }
-            if model.history.isEmpty {
+            if groups.isEmpty {
                 empty
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(groups, id: \.prURL) { group in
-                            GroupHeader(event: group.events[0])
+                        ForEach(groups) { group in
+                            GroupHeader(group: group) { model.openPullRequest(group.prURL) }
+                            if group.events.isEmpty {
+                                Text("No new activity")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.leading, 36)
+                                    .padding(.vertical, 4)
+                            }
                             ForEach(group.events) { event in
                                 EventRow(event: event) { model.open(event) }
                             }
@@ -46,6 +55,12 @@ struct MenuView: View {
             footer
         }
         .frame(width: 380)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(GeometryReader { proxy in
+            Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+        })
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight.wrappedValue = $0 }
+        .background(FitWindowToContent(height: contentHeight.wrappedValue))
         // Catches notifications being turned on in System Settings since the last look.
         .onAppear { Task { await model.refreshNotificationStatus() } }
         // Whatever was unread has now been seen; the highlight stays until the popover closes.
@@ -127,15 +142,42 @@ struct MenuView: View {
         .padding(10)
     }
 
-    /// Events grouped by PR, groups ordered by their newest event.
-    private var groups: [(prURL: String, events: [PREvent])] {
-        var order: [String] = []
-        var byPR: [String: [PREvent]] = [:]
-        for event in model.history {  // already newest first
-            if byPR[event.prURL] == nil { order.append(event.prURL) }
-            byPR[event.prURL, default: []].append(event)
+    /// Events grouped by PR, plus every open PR when the setting is on.
+    private var groups: [ActivityGroups.Group] {
+        ActivityGroups.build(
+            history: model.history,
+            open: model.settings.current.showOpenPullRequests ? model.openPRs : nil
+        )
+    }
+}
+
+/// Sizes the menu window to its content, keeping the top edge under the menu bar.
+/// A `.window`-style MenuBarExtra grows with its content but never shrinks, so when the
+/// content gets shorter (the list empties, a banner goes away, a group is hidden) it sits
+/// at the bottom of a window that is too tall, leaving a gap under the menu bar.
+private struct FitWindowToContent: NSViewRepresentable {
+    let height: CGFloat
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        let height = height
+        // After this layout pass, so the window isn't resized in the middle of one.
+        DispatchQueue.main.async {
+            guard height > 0, let window = nsView.window,
+                  abs(window.frame.height - height) > 0.5 else { return }
+            var frame = window.frame
+            frame.origin.y = frame.maxY - height
+            frame.size.height = height
+            window.setFrame(frame, display: true)
         }
-        return order.map { ($0, byPR[$0]!) }
+    }
+}
+
+private struct ContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
@@ -224,17 +266,70 @@ private struct UpdateBanner: View {
 }
 
 private struct GroupHeader: View {
-    let event: PREvent
+    let group: ActivityGroups.Group
+    let action: () -> Void
+    /// Plain `State`, see EventRow.
+    private let hovering = State(initialValue: false)
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text(event.prLabel).font(.caption.weight(.semibold).monospaced())
-            Text(event.prTitle).font(.caption).lineLimit(1).truncationMode(.tail)
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(group.label).font(.caption.weight(.semibold).monospaced())
+                Text(group.title).font(.caption).lineLimit(1).truncationMode(.tail)
+                if let pr = group.open {
+                    Spacer(minLength: 4)
+                    StatusChips(pr: pr)
+                }
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+            .contentShape(Rectangle())
+            .background(hovering.wrappedValue ? Color.primary.opacity(0.06) : .clear)
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 2)
+        .buttonStyle(.plain)
+        .onHover { hovering.wrappedValue = $0 }
+        .help("Open the pull request")
+    }
+}
+
+/// An open PR's CI and review status, after its title in the group header.
+private struct StatusChips: View {
+    let pr: OpenPullRequest
+
+    var body: some View {
+        HStack(spacing: 4) {
+            switch pr.ci {
+            case .passing: chip("CI", icon: "checkmark", tint: .green)
+            case .failing: chip("CI", icon: "xmark", tint: .red)
+            case .running: chip("CI", icon: "ellipsis", tint: .secondary)
+            case nil: EmptyView()
+            }
+            if pr.isDraft {
+                chip("Draft", icon: nil, tint: .secondary)
+            } else {
+                switch pr.review {
+                case .approved: chip("Approved", icon: "checkmark", tint: .green)
+                case .changesRequested: chip("Changes", icon: "exclamationmark", tint: .red)
+                case .required: chip("Review", icon: nil, tint: .secondary)
+                case nil: EmptyView()
+                }
+            }
+        }
+        .fixedSize()
+    }
+
+    private func chip(_ text: String, icon: String?, tint: Color) -> some View {
+        HStack(spacing: 2) {
+            if let icon { Image(systemName: icon).font(.caption2.weight(.bold)) }
+            Text(text)
+        }
+        .font(.caption2.weight(.medium))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(Capsule().fill(tint.opacity(0.12)))
     }
 }
 
