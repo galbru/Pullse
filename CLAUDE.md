@@ -66,9 +66,11 @@ Two targets. `PullseCore` has no AppKit or SwiftUI and holds all the logic under
 4. `PersistedState.record` adds the events to history. `StateStore` saves it to
    `~/Library/Application Support/Pullse/state.json`, and `Notifier` posts the
    notifications. More than 5 events at once become one summary notification.
-5. The same snapshot gives `AppModel.openPRs` (`OpenPullRequest`: draft, review decision,
-   rollup state), kept in memory only. With `showOpenPullRequests` on, the menu's
-   `ActivityGroups.build` adds the open PRs with no activity after the active groups.
+5. The same snapshot gives the open PRs (`OpenPullRequest`: draft, review decision,
+   rollup state), kept in memory only with the org they came from. `AppModel.openPRs`
+   shows none for another org and drops muted repos (`ActivityGroups.visible`). With
+   `showOpenPullRequests` on, the menu's `ActivityGroups.build` adds the open PRs with no
+   activity after the active groups.
 
 **What counts as new** is the heart of the app (`EventDetector`). An item notifies only if
 its id is not in the seen set **and** its timestamp is at or after `lastPollAt − 5 min`. The
@@ -129,7 +131,8 @@ relative (`../../actions/…`, `../../releases/…`) so they carry no owner or r
 except the downloads badge: shields.io needs `owner/repo` in its URL, and it is the one
 deliberate place the repository is named. It then builds, and only after that pushes the commit and tag back to `main`
 (atomically) and publishes the release. With no notes it only uploads the build as an
-artifact. Pushes made with `GITHUB_TOKEN` don't trigger workflows, so there is no loop. A
+artifact. The release commit's push (deploy key, see below) starts the workflow again, but
+that run finds no notes and only builds, so there is no loop. A
 tag push triggers nothing, so a version cut and tagged locally would never be published.
 Both workflows run on `macos-26`, and actions are pinned by commit SHA. The repository
 allows only GitHub-owned actions and requires SHA pinning, so a new action must be

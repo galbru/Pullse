@@ -224,7 +224,11 @@ public struct PREvent: Codable, Sendable, Identifiable, Hashable {
 
     /// "api#1964"
     public var prLabel: String {
-        if kind == .test { return "Pullse" }
+        kind == .test ? "Pullse" : Self.label(repo: repo, number: number)
+    }
+
+    /// "acme/api", 1964 → "api#1964"
+    public static func label(repo: String, number: Int) -> String {
         let name = repo.split(separator: "/").last.map(String.init) ?? repo
         return "\(name)#\(number)"
     }

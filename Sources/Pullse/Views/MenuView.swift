@@ -14,6 +14,7 @@ struct MenuView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            let groups = activityGroups()
             header
             Divider()
             if let problem = model.notificationProblem {
@@ -30,7 +31,7 @@ struct MenuView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(groups) { group in
-                            GroupHeader(group: group) { model.openPullRequest(group.prURL) }
+                            GroupHeader(group: group) { model.open(group) }
                             if group.events.isEmpty {
                                 Text("No new activity")
                                     .font(.caption)
@@ -45,11 +46,11 @@ struct MenuView: View {
                     }
                     .padding(.vertical, 4)
                     .background(GeometryReader { proxy in
-                        Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
+                        Color.clear.preference(key: MaxHeightKey.self, value: proxy.size.height)
                     })
                 }
                 .frame(height: min(max(listHeight.wrappedValue, 1), maxListHeight))
-                .onPreferenceChange(ListHeightKey.self) { listHeight.wrappedValue = $0 }
+                .onPreferenceChange(MaxHeightKey.self) { listHeight.wrappedValue = $0 }
             }
             Divider()
             footer
@@ -57,9 +58,9 @@ struct MenuView: View {
         .frame(width: 380)
         .fixedSize(horizontal: false, vertical: true)
         .background(GeometryReader { proxy in
-            Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+            Color.clear.preference(key: MaxHeightKey.self, value: proxy.size.height)
         })
-        .onPreferenceChange(ContentHeightKey.self) { contentHeight.wrappedValue = $0 }
+        .onPreferenceChange(MaxHeightKey.self) { contentHeight.wrappedValue = $0 }
         .background(FitWindowToContent(height: contentHeight.wrappedValue))
         // Catches notifications being turned on in System Settings since the last look.
         .onAppear { Task { await model.refreshNotificationStatus() } }
@@ -143,7 +144,7 @@ struct MenuView: View {
     }
 
     /// Events grouped by PR, plus every open PR when the setting is on.
-    private var groups: [ActivityGroups.Group] {
+    private func activityGroups() -> [ActivityGroups.Group] {
         ActivityGroups.build(
             history: model.history,
             open: model.settings.current.showOpenPullRequests ? model.openPRs : nil
@@ -158,14 +159,30 @@ struct MenuView: View {
 private struct FitWindowToContent: NSViewRepresentable {
     let height: CGFloat
 
-    func makeNSView(context: Context) -> NSView { NSView() }
+    func makeNSView(context: Context) -> FittingView { FittingView() }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        let height = height
-        // After this layout pass, so the window isn't resized in the middle of one.
-        DispatchQueue.main.async {
-            guard height > 0, let window = nsView.window,
-                  abs(window.frame.height - height) > 0.5 else { return }
+    func updateNSView(_ nsView: FittingView, context: Context) {
+        nsView.height = height
+    }
+
+    final class FittingView: NSView {
+        var height: CGFloat = 0 {
+            didSet { if height != oldValue { scheduleFit() } }
+        }
+
+        // The height can be measured before this view is in the window; fit once it is.
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            scheduleFit()
+        }
+
+        /// After the current layout pass, so the window isn't resized in the middle of one.
+        private func scheduleFit() {
+            DispatchQueue.main.async { [weak self] in self?.fit() }
+        }
+
+        private func fit() {
+            guard height > 0, let window, abs(window.frame.height - height) > 0.5 else { return }
             var frame = window.frame
             frame.origin.y = frame.maxY - height
             frame.size.height = height
@@ -174,14 +191,8 @@ private struct FitWindowToContent: NSViewRepresentable {
     }
 }
 
-private struct ContentHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
-private struct ListHeightKey: PreferenceKey {
+/// The largest height reported in a subtree, used to measure content.
+private struct MaxHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
@@ -276,8 +287,8 @@ private struct GroupHeader: View {
             HStack(spacing: 6) {
                 Text(group.label).font(.caption.weight(.semibold).monospaced())
                 Text(group.title).font(.caption).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 4)
                 if let pr = group.open {
-                    Spacer(minLength: 4)
                     StatusChips(pr: pr)
                 }
             }

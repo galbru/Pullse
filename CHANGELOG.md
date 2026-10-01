@@ -8,6 +8,16 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Fixed
+- Open pull requests in muted repositories are no longer listed in the menu, and the open
+  pull request count leaves them out.
+- After changing the organization, the menu no longer lists the previous organization's
+  pull requests until the new one has been checked.
+- A pull request's heading in the menu can be clicked anywhere across its row, not only on
+  its title.
+- Clicking the test notification's heading in the menu opens the Pullse repository, like
+  its row does.
+
 ## [0.9.0] - 2026-10-01
 
 ### Added

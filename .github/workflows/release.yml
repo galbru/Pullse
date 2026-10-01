@@ -4,8 +4,8 @@
 # its .sha256, the two assets the in-app updater looks for. A push with no notes gets no
 # release; its build is kept as a downloadable artifact instead.
 #
-# Pushes made with the workflow's own token don't start workflows, so the release commit
-# doesn't trigger this again.
+# The release commit is pushed with a deploy key, which does start this workflow again;
+# that run finds no notes under [Unreleased] and only builds, so it never loops.
 name: Release
 
 on:

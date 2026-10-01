@@ -6,9 +6,9 @@ import PullseCore
 @Observable
 final class AppModel {
     private(set) var history: [PREvent] = []
-    private(set) var openPullRequests = 0
-    /// From the latest poll; not saved, so empty until the first poll after launch.
-    private(set) var openPRs: [OpenPullRequest] = []
+    /// My open PRs as of the latest successful poll, and the org it polled. Not saved, so
+    /// empty until the first poll after launch.
+    private var polledOpenPRs: (org: String, prs: [OpenPullRequest])?
     private(set) var lastPoll: Date?
     private(set) var lastError: String?
     private(set) var isPolling = false
@@ -17,6 +17,15 @@ final class AppModel {
     private(set) var notificationProblem: String?
 
     var unreadCount: Int { history.filter(\.isUnread).count }
+
+    /// The open PRs to show: none from another org (the org was just changed and not polled
+    /// yet), and none from muted repositories.
+    var openPRs: [OpenPullRequest] {
+        guard let polled = polledOpenPRs, polled.org == settings.current.organization else { return [] }
+        return ActivityGroups.visible(polled.prs, settings: settings.current.detectorSettings)
+    }
+
+    var openPullRequests: Int { openPRs.count }
 
     let settings: SettingsModel
     let updater: Updater
@@ -45,8 +54,7 @@ final class AppModel {
 
     /// Demo GIFs only: show a finished poll without talking to GitHub.
     func showAsPolled(openPRs: [OpenPullRequest], at date: Date) {
-        self.openPRs = openPRs
-        openPullRequests = openPRs.count
+        polledOpenPRs = (settings.current.organization ?? "", openPRs)
         lastPoll = date
         lastError = nil
     }
@@ -131,8 +139,7 @@ final class AppModel {
             state.seen = seen
             state.record(events)
             history = state.history
-            openPullRequests = snapshot.myPullRequests.count
-            openPRs = snapshot.myPullRequests.map(OpenPullRequest.init)
+            polledOpenPRs = (org, snapshot.myPullRequests.map(OpenPullRequest.init))
             lastPoll = Date()
             lastError = nil
             save()
@@ -175,7 +182,7 @@ final class AppModel {
                 print("Updates: \(updater.version) is up to date (\(updater.repository ?? "no update source"))")
             }
             print("Open PRs:")
-            for pr in snapshot.myPullRequests.map(OpenPullRequest.init) {
+            for pr in ActivityGroups.visible(snapshot.myPullRequests.map(OpenPullRequest.init), settings: settings) {
                 let status = [
                     pr.ci.map { "CI \($0)" }, pr.isDraft ? "draft" : pr.review.map { "review \($0)" },
                 ].compactMap { $0 }
@@ -255,9 +262,9 @@ final class AppModel {
         }
     }
 
-    /// A group header in the menu: the pull request itself.
-    func openPullRequest(_ prURL: String) {
-        if let link = GitHubLink.safe(prURL), let url = URL(string: link) {
+    /// A group heading in the menu.
+    func open(_ group: ActivityGroups.Group) {
+        if let link = group.link, let url = URL(string: link) {
             NSWorkspace.shared.open(url)
         }
     }

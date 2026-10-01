@@ -92,3 +92,38 @@ func reviewDecisionBecomesTheReviewChip(decision: String, expected: OpenPullRequ
     let on = try JSONDecoder().decode(PullseSettings.self, from: Data(#"{ "showOpenPullRequests": true }"#.utf8))
     #expect(on.showOpenPullRequests)
 }
+
+@Test func openPullRequestsInMutedRepositoriesAreHidden() throws {
+    var settings = DetectorSettings()
+    settings.mutedRepos = DetectorSettings.parseRepoList("sandbox, acme/legacy")
+    let open = try [
+        openPR(pr(repo: "acme/api", number: 1)),
+        openPR(pr(repo: "acme/Sandbox", number: 2)),
+        openPR(pr(repo: "acme/legacy", number: 3)),
+        openPR(pr(repo: "other/legacy", number: 4)),
+    ]
+    #expect(ActivityGroups.visible(open, settings: settings).map(\.prLabel) == ["api#1", "legacy#4"])
+}
+
+@Test func aHeadingOpensItsPullRequestOrElseItsNewestEventsLink() throws {
+    let open = try openPR(pr(number: 1))
+    let groups = ActivityGroups.build(history: [], open: [open])
+    #expect(groups[0].link == "https://github.com/acme/api/pull/1")
+
+    let test = PREvent(
+        id: "test", kind: .test, repo: "", number: 0, prTitle: "Test notification",
+        prURL: "pullse:test", author: nil, headline: "Test", snippet: "",
+        url: "https://github.com/acme/pullse", date: now
+    )
+    let testGroup = ActivityGroups.build(history: [test], open: nil)[0]
+    #expect(testGroup.label == "Pullse")
+    #expect(testGroup.link == "https://github.com/acme/pullse")
+}
+
+@Test func openPullRequestsOpenedAtTheSameTimeKeepAStableOrder() throws {
+    let open = try (1...5).map { try openPR(pr(number: $0)) }
+    let first = ActivityGroups.build(history: [], open: open).map(\.label)
+    for _ in 0..<10 {
+        #expect(ActivityGroups.build(history: [], open: open.shuffled()).map(\.label) == first)
+    }
+}

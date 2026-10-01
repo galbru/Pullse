@@ -51,10 +51,7 @@ public struct OpenPullRequest: Sendable, Hashable {
     }
 
     /// "api#1964", as on `PREvent`.
-    public var prLabel: String {
-        let name = repo.split(separator: "/").last.map(String.init) ?? repo
-        return "\(name)#\(number)"
-    }
+    public var prLabel: String { PREvent.label(repo: repo, number: number) }
 }
 
 /// The menu's list: events grouped by pull request, and optionally every open PR of mine
@@ -70,6 +67,10 @@ public enum ActivityGroups {
         public let events: [PREvent]
 
         public var id: String { prURL }
+
+        /// What clicking the heading opens: the pull request, or for a group that isn't
+        /// one (the test notification) its newest event's link.
+        public var link: String? { GitHubLink.safe(prURL, fallback: events.first?.url) }
     }
 
     /// Groups with events come first, ordered by their newest event. With `open` given
@@ -90,11 +91,15 @@ public enum ActivityGroups {
                 title: pr?.title ?? events[0].prTitle, open: pr, events: events
             )
         }
-        let quiet = (open ?? [])
+        let quiet = openByURL.values
             .filter { byPR[$0.url] == nil }
-            .sorted { $0.createdAt > $1.createdAt }
+            .sorted { ($0.createdAt, $0.url) > ($1.createdAt, $1.url) }
             .map { Group(prURL: $0.url, label: $0.prLabel, title: $0.title, open: $0, events: []) }
-        var seen = Set<String>()
-        return (active + quiet).filter { seen.insert($0.prURL).inserted }
+        return active + quiet
+    }
+
+    /// The open PRs the menu lists: those outside muted repositories, in the order given.
+    public static func visible(_ open: [OpenPullRequest], settings: DetectorSettings) -> [OpenPullRequest] {
+        open.filter { !settings.isMuted(nameWithOwner: $0.repo) }
     }
 }

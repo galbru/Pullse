@@ -23,8 +23,13 @@ public struct DetectorSettings: Sendable {
     }
 
     func isMuted(_ repository: Repository) -> Bool {
-        mutedRepos.contains(repository.nameWithOwner.lowercased())
-            || mutedRepos.contains(repository.name.lowercased())
+        isMuted(nameWithOwner: repository.nameWithOwner)
+    }
+
+    /// `owner/name` is muted when either it or its bare name is in the list.
+    public func isMuted(nameWithOwner: String) -> Bool {
+        let name = nameWithOwner.split(separator: "/").last.map(String.init) ?? nameWithOwner
+        return mutedRepos.contains(nameWithOwner.lowercased()) || mutedRepos.contains(name.lowercased())
     }
 }
 
