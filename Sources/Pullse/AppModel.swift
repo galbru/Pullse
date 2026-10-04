@@ -181,6 +181,9 @@ final class AppModel {
             } else {
                 print("Updates: \(updater.version) is up to date (\(updater.repository ?? "no update source"))")
             }
+            if let local = updater.localBuildDescription {
+                print("Build: \(local)")
+            }
             print("Open PRs:")
             for pr in ActivityGroups.visible(snapshot.myPullRequests.map(OpenPullRequest.init), settings: settings) {
                 let status = [

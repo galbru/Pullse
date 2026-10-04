@@ -210,7 +210,8 @@ struct SettingsView: View {
 
     @ViewBuilder private var updatesPage: some View {
         Section {
-            LabeledContent("Version", value: "\(updater.version) (build \(updater.build))")
+            LabeledContent("Version", value: "\(updater.version) (build \(updater.build))"
+                + (updater.localBuildDescription.map { " · \($0)" } ?? ""))
             HStack {
                 Button("Check now") { Task { await updater.check() } }
                     .disabled(updater.isBusy || updater.repository == nil)

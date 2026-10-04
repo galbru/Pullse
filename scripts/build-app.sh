@@ -47,6 +47,16 @@ else
     echo "note: no GitHub origin remote, update checks disabled in this build" >&2
 fi
 
+# A build made outside GitHub Actions is marked with the commit it was built from (plus
+# "-modified" with uncommitted changes), so the app can show it isn't a release.
+if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+    LOCAL="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    if [ "$LOCAL" != unknown ] && [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+        LOCAL="$LOCAL-modified"
+    fi
+    plutil -replace PullseLocalBuild -string "$LOCAL" "$APP/Contents/Info.plist"
+fi
+
 # Ad-hoc signature: enough for notifications and launch-at-login on this Mac.
 codesign --force --sign - --timestamp=none "$APP"
 

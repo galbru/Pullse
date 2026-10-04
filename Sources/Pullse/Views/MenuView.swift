@@ -131,6 +131,12 @@ struct MenuView: View {
             Text("v\(model.updater.version)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+            if let local = model.updater.localBuildDescription {
+                Label("local", systemImage: "hammer")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .help("Built on this Mac (\(local)), not a release")
+            }
             Spacer()
             Button("Settings…") {
                 NSApp.activate(ignoringOtherApps: true)

@@ -26,6 +26,9 @@ final class Updater {
     private(set) var build: String
     /// owner/name of the repo this build came from; nil disables updates.
     let repository: String?
+    /// Set when the app was built on this Mac rather than by GitHub Actions: the commit it
+    /// was built from, with "-modified" when it had uncommitted changes.
+    private(set) var localBuild: String?
 
     static let checkInterval: Duration = .seconds(60 * 60)
 
@@ -43,6 +46,14 @@ final class Updater {
         build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
         let repo = bundle.object(forInfoDictionaryKey: "PullseUpdateRepository") as? String
         repository = repo.flatMap { UpdateChecker.isValidRepository($0) ? $0 : nil }
+        localBuild = bundle.object(forInfoDictionaryKey: "PullseLocalBuild") as? String
+    }
+
+    /// "local build 5898aea, modified", or nil for a release or CI build.
+    var localBuildDescription: String? {
+        guard let localBuild else { return nil }
+        let commit = localBuild.replacingOccurrences(of: "-modified", with: "")
+        return "local build \(commit)" + (localBuild.hasSuffix("-modified") ? ", modified" : "")
     }
 
     var currentVersion: SemanticVersion? { SemanticVersion(version) }
@@ -227,9 +238,15 @@ final class Updater {
     func showAvailable(_ update: AvailableUpdate, runningVersion version: String, build: String) {
         self.version = version
         self.build = build
+        localBuild = nil
         previewInstallable = true
         available = update
         lastChecked = Date()
+    }
+
+    /// Demo GIFs only: look like a release, even though the demo runs from a local build.
+    func showAsRelease() {
+        localBuild = nil
     }
 
     /// Demo GIFs only: show an install at `phase` without doing one.

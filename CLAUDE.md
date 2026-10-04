@@ -104,8 +104,10 @@ doesn't abort a request half way.
 
 **Versions and updates.** `VERSION` is the only place the version lives.
 `scripts/build-app.sh` stamps it into the bundle, along with a build number and
-`PullseUpdateRepository` (owner/name from `$GITHUB_REPOSITORY` or the `origin` remote). The
-committed `Info.plist` holds placeholders. `Updater` (app target) uses the pure
+`PullseUpdateRepository` (owner/name from `$GITHUB_REPOSITORY` or the `origin` remote). Outside
+GitHub Actions it also stamps `PullseLocalBuild` (short commit, `-modified` if the tree is
+dirty), which shows as "local" next to the version in the menu and Settings; the demos hide
+it. The committed `Info.plist` holds placeholders. `Updater` (app target) uses the pure
 `UpdateChecker` (`Updates.swift`) to pick the newest non-draft release above the running
 version that has both `Pullse-<v>.zip` and `.zip.sha256`. Those names come from
 `scripts/package.sh`, so keep the two in sync. Install: download through the REST API with

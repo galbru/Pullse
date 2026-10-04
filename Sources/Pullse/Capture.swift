@@ -78,6 +78,7 @@ enum Capture {
         let model = AppModel(store: store, settings: SettingsModel(
             file: settingsFile, displayPath: "~/.config/pullse/settings.json"
         ))
+        model.updater.showAsRelease()
         model.showAsPolled(openPRs: sampleOpenPRs(now: Date()), at: Date().addingTimeInterval(-20))
         let asset = { (id: Int, name: String) in
             ReleaseAsset(id: id, name: name, url: "https://api.github.com/assets/\(id)", size: 0)
