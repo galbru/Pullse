@@ -8,6 +8,12 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Added
+- A keyboard shortcut to open and close the menu from any app. Record one in Settings →
+  App → Keyboard; there's none until you do.
+- Keyboard control in the menu: ↑ ↓ move between pull requests and items, Return opens the
+  selected one on GitHub, ⌘R refreshes, ⌘S opens Settings and Esc closes the menu.
+
 ## [0.9.1] - 2026-10-02
 
 ### Fixed

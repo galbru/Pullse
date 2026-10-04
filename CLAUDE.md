@@ -102,6 +102,13 @@ the interval or org changes. A `poll()` requested while one is running sets `pol
 instead of being dropped. The fetch runs in an unstructured `Task`, so cancelling the loop
 doesn't abort a request half way.
 
+**Keyboard.** `GlobalShortcut` registers `openMenuShortcut` with Carbon's
+`RegisterEventHotKey`, which needs no Accessibility permission. `MenuBarExtra` has no API
+to open its window, so `MenuToggle` clicks Pullse's status bar button (`performClick`).
+Inside the menu, `MenuKeys` reads keys with a local event monitor limited to the menu
+window, because SwiftUI focus has nothing focused there; the selection order is
+`ActivityGroups.rowIDs`/`next`.
+
 **Versions and updates.** `VERSION` is the only place the version lives.
 `scripts/build-app.sh` stamps it into the bundle, along with a build number and
 `PullseUpdateRepository` (owner/name from `$GITHUB_REPOSITORY` or the `origin` remote). Outside

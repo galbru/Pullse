@@ -29,6 +29,7 @@ final class AppModel {
 
     let settings: SettingsModel
     let updater: Updater
+    let shortcut = GlobalShortcut()
     @ObservationIgnored let notifier = Notifier()
     @ObservationIgnored private let client: GitHubClient
     @ObservationIgnored private let store: StateStore
@@ -66,6 +67,16 @@ final class AppModel {
         announceUpdateIfNew()
         restartLoop()
         updater.start()
+        watchShortcut()
+    }
+
+    /// Registers the menu shortcut, and again whenever it changes, in Settings or by hand.
+    private func watchShortcut() {
+        withObservationTracking {
+            shortcut.apply(settings.current.openMenuShortcut)
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.watchShortcut() }
+        }
     }
 
     /// Once per new version: "Pullse updated to x.y.z", after an update or a reinstall.

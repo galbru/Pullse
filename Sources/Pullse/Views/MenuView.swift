@@ -11,6 +11,12 @@ struct MenuView: View {
     private let maxListHeight: CGFloat = 440
     /// Height of the whole menu, for `FitWindowToContent`. Plain `State`, see EventRow.
     private let contentHeight = State<CGFloat>(initialValue: 0)
+    /// The highlighted row (`ActivityGroups.headingID`/`eventID`), from the keyboard or
+    /// the pointer. Plain `State`, see EventRow.
+    private let selection = State<String?>(initialValue: nil)
+    /// Set when the keyboard moved the selection, so the list scrolls to it; the pointer
+    /// moving over a row shouldn't scroll.
+    private let scrollToSelection = State(initialValue: false)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -28,29 +34,48 @@ struct MenuView: View {
             if groups.isEmpty {
                 empty
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(groups) { group in
-                            GroupHeader(group: group) { model.open(group) }
-                            if group.events.isEmpty {
-                                Text("No new activity")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                    .padding(.leading, 36)
-                                    .padding(.vertical, 4)
-                            }
-                            ForEach(group.events) { event in
-                                EventRow(event: event) { model.open(event) }
+                ScrollViewReader { scroller in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(groups) { group in
+                                let heading = ActivityGroups.headingID(group)
+                                GroupHeader(group: group, isSelected: selection.wrappedValue == heading) {
+                                    hover(heading, $0)
+                                } action: {
+                                    model.open(group)
+                                }
+                                .id(heading)
+                                if group.events.isEmpty {
+                                    Text("No new activity")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                        .padding(.leading, 36)
+                                        .padding(.vertical, 4)
+                                }
+                                ForEach(group.events) { event in
+                                    let row = ActivityGroups.eventID(event)
+                                    EventRow(event: event, isSelected: selection.wrappedValue == row) {
+                                        hover(row, $0)
+                                    } action: {
+                                        model.open(event)
+                                    }
+                                    .id(row)
+                                }
                             }
                         }
+                        .padding(.vertical, 4)
+                        .background(GeometryReader { proxy in
+                            Color.clear.preference(key: MaxHeightKey.self, value: proxy.size.height)
+                        })
                     }
-                    .padding(.vertical, 4)
-                    .background(GeometryReader { proxy in
-                        Color.clear.preference(key: MaxHeightKey.self, value: proxy.size.height)
-                    })
+                    .frame(height: min(max(listHeight.wrappedValue, 1), maxListHeight))
+                    .onPreferenceChange(MaxHeightKey.self) { listHeight.wrappedValue = $0 }
+                    .onChange(of: selection.wrappedValue) { _, row in
+                        guard scrollToSelection.wrappedValue, let row else { return }
+                        scrollToSelection.wrappedValue = false
+                        scroller.scrollTo(row)
+                    }
                 }
-                .frame(height: min(max(listHeight.wrappedValue, 1), maxListHeight))
-                .onPreferenceChange(MaxHeightKey.self) { listHeight.wrappedValue = $0 }
             }
             Divider()
             footer
@@ -62,6 +87,9 @@ struct MenuView: View {
         })
         .onPreferenceChange(MaxHeightKey.self) { contentHeight.wrappedValue = $0 }
         .background(FitWindowToContent(height: contentHeight.wrappedValue))
+        .background(MenuKeys(onOpen: { selection.wrappedValue = nil }) { key in
+            handle(key, rows: ActivityGroups.rowIDs(activityGroups()))
+        })
         // Catches notifications being turned on in System Settings since the last look.
         .onAppear { Task { await model.refreshNotificationStatus() } }
         // Whatever was unread has now been seen; the highlight stays until the popover closes.
@@ -84,7 +112,7 @@ struct MenuView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.borderless)
-                .help("Refresh now")
+                .help("Refresh now (⌘R)")
             }
         }
         .padding(12)
@@ -138,15 +166,59 @@ struct MenuView: View {
                     .help("Built on this Mac (\(local)), not a release")
             }
             Spacer()
-            Button("Settings…") {
-                NSApp.activate(ignoringOtherApps: true)
-                openSettings()
-            }
+            Button("Settings…") { showSettings() }
+                .help("Settings (⌘S)")
             Button("Quit") { NSApp.terminate(nil) }
         }
         .buttonStyle(.borderless)
         .font(.callout)
         .padding(10)
+    }
+
+    /// The pointer highlights the row it is over, and clears it on the way out.
+    private func hover(_ row: String, _ inside: Bool) {
+        if inside {
+            selection.wrappedValue = row
+        } else if selection.wrappedValue == row {
+            selection.wrappedValue = nil
+        }
+    }
+
+    /// The menu's keys. Returns false for keys it leaves to the window.
+    private func handle(_ key: MenuKeys.Key, rows: [String]) -> Bool {
+        switch (key.code, key.command) {
+        case (125, false), (126, false):  // ↓ ↑
+            scrollToSelection.wrappedValue = true
+            selection.wrappedValue = ActivityGroups.next(
+                after: selection.wrappedValue, in: rows, by: key.code == 125 ? 1 : -1
+            )
+        case (36, false), (76, false):  // Return, Enter
+            open(selection.wrappedValue)
+        case (53, false):  // Esc
+            MenuToggle.toggle()
+        case (15, true):  // ⌘R
+            Task { await model.poll() }
+        case (1, true):  // ⌘S
+            showSettings()
+        default:
+            return false
+        }
+        return true
+    }
+
+    private func open(_ row: String?) {
+        guard let row else { return }
+        for group in activityGroups() {
+            if ActivityGroups.headingID(group) == row { return model.open(group) }
+            if let event = group.events.first(where: { ActivityGroups.eventID($0) == row }) {
+                return model.open(event)
+            }
+        }
+    }
+
+    private func showSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
     }
 
     /// Events grouped by PR, plus every open PR when the setting is on.
@@ -193,6 +265,56 @@ private struct FitWindowToContent: NSViewRepresentable {
             frame.origin.y = frame.maxY - height
             frame.size.height = height
             window.setFrame(frame, display: true)
+        }
+    }
+}
+
+/// The menu's keyboard handling. The keys are read with a local event monitor limited to
+/// the menu's own window: a MenuBarExtra window gives SwiftUI's focus system nothing
+/// focused to send them to.
+private struct MenuKeys: NSViewRepresentable {
+    struct Key {
+        let code: UInt16
+        /// ⌘ held, with no ⌥ or ⌃.
+        let command: Bool
+    }
+
+    /// Each time the menu opens.
+    let onOpen: () -> Void
+    /// True when the key was handled, and so shouldn't reach the window.
+    let onKey: (Key) -> Bool
+
+    func makeNSView(context: Context) -> KeyView { KeyView() }
+
+    func updateNSView(_ nsView: KeyView, context: Context) {
+        nsView.onOpen = onOpen
+        nsView.onKey = onKey
+    }
+
+    final class KeyView: NSView {
+        var onOpen: () -> Void = {}
+        var onKey: (Key) -> Bool = { _ in false }
+        private var monitor: Any?
+        private var opened: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            if let opened { NotificationCenter.default.removeObserver(opened) }
+            monitor = nil
+            opened = nil
+            guard let window else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, event.window === self.window else { return event }
+                let flags = event.modifierFlags.intersection([.command, .option, .control])
+                guard flags.isEmpty || flags == .command else { return event }
+                return self.onKey(Key(code: event.keyCode, command: flags == .command)) ? nil : event
+            }
+            opened = NotificationCenter.default.addObserver(
+                forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.onOpen() }
+            }
         }
     }
 }
@@ -284,9 +406,9 @@ private struct UpdateBanner: View {
 
 private struct GroupHeader: View {
     let group: ActivityGroups.Group
+    let isSelected: Bool
+    let onHover: (Bool) -> Void
     let action: () -> Void
-    /// Plain `State`, see EventRow.
-    private let hovering = State(initialValue: false)
 
     var body: some View {
         Button(action: action) {
@@ -303,10 +425,10 @@ private struct GroupHeader: View {
             .padding(.top, 10)
             .padding(.bottom, 2)
             .contentShape(Rectangle())
-            .background(hovering.wrappedValue ? Color.primary.opacity(0.06) : .clear)
+            .background(isSelected ? Color.primary.opacity(0.06) : .clear)
         }
         .buttonStyle(.plain)
-        .onHover { hovering.wrappedValue = $0 }
+        .onHover(perform: onHover)
         .help("Open the pull request")
     }
 }
@@ -350,12 +472,14 @@ private struct StatusChips: View {
     }
 }
 
+// Views keep their state as plain `State` rather than `@State`: in the macOS 27 SDK
+// `@State` is a macro whose plugin ships only with Xcode, and this builds with the
+// Command Line Tools too.
 private struct EventRow: View {
     let event: PREvent
+    let isSelected: Bool
+    let onHover: (Bool) -> Void
     let action: () -> Void
-    // Plain `State` rather than `@State`: in the macOS 27 SDK `@State` is a macro whose
-    // plugin ships only with Xcode, and this builds with the Command Line Tools too.
-    private let hovering = State(initialValue: false)
 
     var body: some View {
         Button(action: action) {
@@ -389,10 +513,10 @@ private struct EventRow: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .contentShape(Rectangle())
-            .background(hovering.wrappedValue ? Color.primary.opacity(0.06) : .clear)
+            .background(isSelected ? Color.primary.opacity(0.06) : .clear)
         }
         .buttonStyle(.plain)
-        .onHover { hovering.wrappedValue = $0 }
+        .onHover(perform: onHover)
     }
 
     private var icon: String {

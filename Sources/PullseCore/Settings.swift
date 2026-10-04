@@ -17,6 +17,8 @@ public struct PullseSettings: Codable, Equatable, Sendable {
     /// List every open PR of mine in the menu, with its CI and review status, even when
     /// it has no new activity.
     public var showOpenPullRequests = false
+    /// Opens and closes the menu from any app. None until the user records one.
+    public var openMenuShortcut: HotKey?
     /// Look for new releases (on launch and every hour) and show when one exists.
     public var checkForUpdates = true
     /// Install a new release once it's found and Pullse isn't in use, then relaunch.
@@ -47,6 +49,8 @@ public struct PullseSettings: Codable, Equatable, Sendable {
         includeBots = try c.decodeIfPresent(Bool.self, forKey: .includeBots) ?? d.includeBots
         mutedRepos = try c.decodeIfPresent([String].self, forKey: .mutedRepos) ?? d.mutedRepos
         showOpenPullRequests = try c.decodeIfPresent(Bool.self, forKey: .showOpenPullRequests) ?? d.showOpenPullRequests
+        // A hand-edited shortcut that doesn't decode is treated as none, not as a broken file.
+        openMenuShortcut = (try? c.decodeIfPresent(HotKey.self, forKey: .openMenuShortcut)) ?? nil
         checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? d.checkForUpdates
         autoUpdate = try c.decodeIfPresent(Bool.self, forKey: .autoUpdate) ?? d.autoUpdate
         includePrereleases = try c.decodeIfPresent(Bool.self, forKey: .includePrereleases) ?? d.includePrereleases

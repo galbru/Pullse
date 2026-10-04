@@ -283,6 +283,22 @@ struct SettingsView: View {
     // MARK: - App
 
     @ViewBuilder private var appPage: some View {
+        Section {
+            LabeledContent("Open Pullse menu") {
+                ShortcutRecorder(
+                    shortcut: settings.current.openMenuShortcut, globalShortcut: model.shortcut
+                ) { hotKey in settings.update { $0.openMenuShortcut = hotKey } }
+            }
+        } header: {
+            Text("Keyboard")
+        } footer: {
+            if let error = model.shortcut.registrationError {
+                Footnote(error, isError: true)
+            } else {
+                Footnote("Opens and closes the menu from any app. In the menu, ↑ ↓ move, Return opens, ⌘R refreshes, ⌘S opens Settings and Esc closes.")
+            }
+        }
+
         Section("Startup") {
             Toggle("Launch at login", isOn: launchAtLogin.projectedValue)
                 .onChange(of: launchAtLogin.wrappedValue) { _, enabled in setLaunchAtLogin(enabled) }
@@ -393,5 +409,95 @@ private struct SidebarRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Records a global shortcut: click, then press the keys. Esc cancels.
+private struct ShortcutRecorder: View {
+    let shortcut: HotKey?
+    let globalShortcut: GlobalShortcut
+    let onChange: (HotKey?) -> Void
+    // Plain `State`, see EventRow in MenuView.
+    private let recording = State(initialValue: false)
+    private let hint = State<String?>(initialValue: nil)
+    private let monitor = State(initialValue: MonitorBox())
+
+    /// Holds the key monitor while recording; a class, so stopping it needs no view update.
+    final class MonitorBox {
+        var token: Any?
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let hint = hint.wrappedValue {
+                Text(hint).font(.caption).foregroundStyle(.red)
+            }
+            Button(recording.wrappedValue ? "Press a shortcut…" : shortcut?.display ?? "Record Shortcut") {
+                recording.wrappedValue ? stop() : start()
+            }
+            if shortcut != nil, !recording.wrappedValue {
+                Button {
+                    onChange(nil)
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Remove the shortcut")
+            }
+        }
+        .onDisappear { stop() }
+    }
+
+    private func start() {
+        hint.wrappedValue = nil
+        recording.wrappedValue = true
+        globalShortcut.suspend()
+        monitor.wrappedValue.token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            record(event)
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let token = monitor.wrappedValue.token {
+            NSEvent.removeMonitor(token)
+            monitor.wrappedValue.token = nil
+        }
+        if recording.wrappedValue {
+            recording.wrappedValue = false
+            globalShortcut.resume()
+        }
+    }
+
+    private func record(_ event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        var modifiers = Set<HotKey.Modifier>()
+        if flags.contains(.command) { modifiers.insert(.command) }
+        if flags.contains(.option) { modifiers.insert(.option) }
+        if flags.contains(.control) { modifiers.insert(.control) }
+        if flags.contains(.shift) { modifiers.insert(.shift) }
+        if event.keyCode == 53, modifiers.isEmpty {  // Esc
+            stop()
+            return
+        }
+        let hotKey = HotKey(keyCode: Int(event.keyCode), key: Self.keyName(event), modifiers: modifiers)
+        guard hotKey.isValid else {
+            hint.wrappedValue = "Add ⌘, ⌥ or ⌃"
+            return
+        }
+        hint.wrappedValue = nil
+        stop()
+        onChange(hotKey)
+    }
+
+    /// The key's name for display: the special keys by name or symbol, else its character.
+    private static func keyName(_ event: NSEvent) -> String {
+        let special: [UInt16: String] = [
+            122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5", 97: "F6", 98: "F7", 100: "F8",
+            101: "F9", 109: "F10", 103: "F11", 111: "F12", 49: "Space", 36: "↩", 48: "⇥",
+            51: "⌫", 117: "⌦", 53: "⎋", 123: "←", 124: "→", 125: "↓", 126: "↑",
+        ]
+        if let name = special[event.keyCode] { return name }
+        return (event.charactersIgnoringModifiers ?? "").uppercased()
     }
 }

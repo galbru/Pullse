@@ -21,6 +21,10 @@ to also list every open PR you authored, with its CI and review status, even whe
 new has happened on it. Right-click the icon for About (the GitHub repository), Settings
 and Quit.
 
+Pullse works from the keyboard too. Record a shortcut in Settings → App → Keyboard to open
+and close the menu from any app. In the menu, ↑ ↓ move, Return opens the selected item on
+GitHub, ⌘R refreshes, ⌘S opens Settings and Esc closes it.
+
 ## See it in action
 
 **Something happens on your PR.** A review or a failed CI run shows up as a native
@@ -160,6 +164,7 @@ edits it, and changes made by hand are picked up on the next check.
   "includeBots": false,
   "mutedRepos": ["sandbox", "your-org/legacy-app"],
   "showOpenPullRequests": false,
+  "openMenuShortcut": { "keyCode": 35, "key": "P", "modifiers": ["control", "option"] },
   "checkForUpdates": true,
   "autoUpdate": false,
   "includePrereleases": false,

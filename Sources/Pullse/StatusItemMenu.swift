@@ -31,6 +31,11 @@ final class StatusItemMenu: NSObject {
         }
     }
 
+    /// Pullse's status item button, wherever its status bar window is.
+    static func statusButton() -> NSStatusBarButton? {
+        NSApp.windows.lazy.compactMap { statusButton(in: $0) }.first
+    }
+
     /// The status item button, if `window` is the status bar window it lives in.
     private static func statusButton(in window: NSWindow?) -> NSStatusBarButton? {
         guard let window, window.className.contains("StatusBarWindow") else { return nil }
