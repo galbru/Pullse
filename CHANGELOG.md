@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-08
+
 ### Fixed
 - A copy of Pullse built from source without a bundle id no longer offers to install
   updates it can't install. It shows Download, which opens the release page, and says why.
