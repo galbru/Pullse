@@ -95,7 +95,10 @@ the only settings store. There are no `UserDefaults` or `@AppStorage`. `PullseSe
 leniently: every key is optional. A file that doesn't parse is never overwritten, and saves
 are blocked until it is fixed. `bundleIdentifier` in the same file is read only by
 `scripts/build-app.sh`, which stamps it into the bundle's `Info.plist`. `BUNDLE_ID` in the
-environment overrides it, and with neither the build uses `com.example.pullse`.
+environment overrides it, and with neither the build uses `com.example.pullse`. A local
+build with that placeholder can't install releases (the bundle id check refuses them), so
+the script stamps `PullsePlaceholderBundleID` and the updater shows Download instead of
+Install (`UpdateChecker.canInstallReleases`).
 
 **Poll loop.** `AppModel.restartLoop()` cancels and restarts the timer; it is called when
 the interval or org changes. A `poll()` requested while one is running sets `pollAgain`

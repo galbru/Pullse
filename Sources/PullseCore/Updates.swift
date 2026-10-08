@@ -113,6 +113,14 @@ public struct AvailableUpdate: Sendable, Equatable {
 }
 
 public enum UpdateChecker {
+    /// Whether a build's bundle id lets it install a release in place. A local build
+    /// made without a bundle id has a placeholder no release has, and the install refuses
+    /// an update whose bundle id differs, so it can only download. A CI build with the
+    /// placeholder (a fork that never set one) still can: its releases all share it.
+    public static func canInstallReleases(placeholderBundleID: Bool, localBuild: String?) -> Bool {
+        !(placeholderBundleID && localBuild != nil)
+    }
+
     /// The zip `scripts/package.sh` produces for a version; its checksum is this plus
     /// ".sha256".
     public static func archiveName(for version: SemanticVersion) -> String {

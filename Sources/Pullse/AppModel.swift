@@ -195,6 +195,9 @@ final class AppModel {
             if let local = updater.localBuildDescription {
                 print("Build: \(local)")
             }
+            print("Install: " + (updater.canInstallInPlace ? "in place"
+                : updater.hasPlaceholderBundleID ? "download only, built without a bundle id"
+                : "download only, not in an Applications folder"))
             print("Open PRs:")
             for pr in ActivityGroups.visible(snapshot.myPullRequests.map(OpenPullRequest.init), settings: settings) {
                 let status = [
