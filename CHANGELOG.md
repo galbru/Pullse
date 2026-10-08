@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-08
+
 ### Added
 - A notification when one of your open pull requests becomes ready to merge: approved,
   no conflicts, not a draft, and every check green. It fires on the change, stays quiet
