@@ -261,7 +261,7 @@ struct SettingsView: View {
                     } else {
                         Button("What's new") { updater.openReleasePage() }
                             .buttonStyle(.link)
-                        if !updater.canInstallInPlace, AppMover.shouldOffer {
+                        if !updater.canInstallInPlace, !updater.hasPlaceholderBundleID, AppMover.shouldOffer {
                             Button("Move to Applications") { AppMover.move() }
                                 .buttonStyle(.borderedProminent)
                         } else {
@@ -290,7 +290,9 @@ struct SettingsView: View {
         } header: {
             Text("Automatic updates")
         } footer: {
-            if updater.canInstallInPlace, settings.current.autoUpdate {
+            if updater.hasPlaceholderBundleID {
+                Footnote("This build was made without a bundle id, so it can't install releases, which have their own: updates open the download page. Install a release from there once, and later updates install in place.")
+            } else if updater.canInstallInPlace, settings.current.autoUpdate {
                 Footnote("Automatic installs wait until the menu and this window are closed, then restart Pullse.")
             } else if AppMover.shouldOffer {
                 HStack(alignment: .firstTextBaseline) {

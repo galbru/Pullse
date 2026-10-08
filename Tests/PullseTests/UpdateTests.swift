@@ -173,3 +173,11 @@ private let hash = String(repeating: "ab", count: 32)
     let state = try JSONDecoder.github.decode(PersistedState.self, from: Data(old.utf8))
     #expect(state.lastRunVersion == nil)
 }
+
+@Test func onlyALocalBuildWithThePlaceholderIDCantInstallReleases() {
+    #expect(!UpdateChecker.canInstallReleases(placeholderBundleID: true, localBuild: "dce94b2"))
+    // A fork's CI release made without a bundle id: its releases share the placeholder.
+    #expect(UpdateChecker.canInstallReleases(placeholderBundleID: true, localBuild: nil))
+    #expect(UpdateChecker.canInstallReleases(placeholderBundleID: false, localBuild: "dce94b2"))
+    #expect(UpdateChecker.canInstallReleases(placeholderBundleID: false, localBuild: nil))
+}

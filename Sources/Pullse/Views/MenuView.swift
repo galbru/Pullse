@@ -388,7 +388,7 @@ private struct UpdateBanner: View {
                 ProgressView().controlSize(.small)
             } else {
                 Button("What's new") { updater.openReleasePage() }
-                if !updater.canInstallInPlace, AppMover.shouldOffer {
+                if !updater.canInstallInPlace, !updater.hasPlaceholderBundleID, AppMover.shouldOffer {
                     Button("Move to Applications") { AppMover.move() }
                         .buttonStyle(.borderedProminent)
                 } else {
@@ -412,6 +412,9 @@ private struct UpdateBanner: View {
         case .installing: return "Verifying and installing…"
         case .idle, .checking:
             if let error = updater.error { return error }
+            if updater.hasPlaceholderBundleID {
+                return "You have \(updater.version), built without a bundle id, so it can't install releases itself."
+            }
             if updater.canInstallInPlace { return "You have \(updater.version). Pullse restarts to finish." }
             return AppMover.shouldOffer
                 ? "You have \(updater.version). Pullse can update itself once it's in Applications."

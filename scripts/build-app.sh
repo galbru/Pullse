@@ -24,8 +24,14 @@ fi
 if [ -z "$BUNDLE_ID" ]; then
     BUNDLE_ID="com.example.pullse"
     echo "note: no bundleIdentifier in $SETTINGS, using $BUNDLE_ID" >&2
+    # Releases carry a real id and the updater refuses one that differs, so a local build
+    # with the placeholder offers Download instead of Install (UpdateChecker.canInstallReleases).
+    PLACEHOLDER_ID=1
 fi
 plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$APP/Contents/Info.plist"
+if [ -n "${PLACEHOLDER_ID:-}" ]; then
+    plutil -replace PullsePlaceholderBundleID -bool true "$APP/Contents/Info.plist"
+fi
 
 # Version from VERSION; build number from CI's run number, else the commit count.
 VERSION="$(tr -d '[:space:]' < VERSION)"

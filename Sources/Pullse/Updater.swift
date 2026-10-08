@@ -29,6 +29,9 @@ final class Updater {
     /// Set when the app was built on this Mac rather than by GitHub Actions: the commit it
     /// was built from, with "-modified" when it had uncommitted changes.
     private(set) var localBuild: String?
+    /// A local build made without a bundle id, which can't install releases and gets
+    /// "Download" instead (`UpdateChecker.canInstallReleases`).
+    private(set) var hasPlaceholderBundleID = false
 
     static let checkInterval: Duration = .seconds(60 * 60)
 
@@ -47,6 +50,10 @@ final class Updater {
         let repo = bundle.object(forInfoDictionaryKey: "PullseUpdateRepository") as? String
         repository = repo.flatMap { UpdateChecker.isValidRepository($0) ? $0 : nil }
         localBuild = bundle.object(forInfoDictionaryKey: "PullseLocalBuild") as? String
+        hasPlaceholderBundleID = !UpdateChecker.canInstallReleases(
+            placeholderBundleID: bundle.object(forInfoDictionaryKey: "PullsePlaceholderBundleID") as? Bool ?? false,
+            localBuild: localBuild
+        )
     }
 
     /// "local build 5898aea, modified", or nil for a release or CI build.
@@ -64,6 +71,7 @@ final class Updater {
     /// can write to. A copy run from `build/` or a read-only volume gets "Download".
     var canInstallInPlace: Bool {
         if let previewInstallable { return previewInstallable }
+        if hasPlaceholderBundleID { return false }
         let bundle = Bundle.main.bundleURL.standardizedFileURL
         let parent = bundle.deletingLastPathComponent().path
         let applications = ["/Applications", NSHomeDirectory() + "/Applications"]
@@ -247,6 +255,7 @@ final class Updater {
     /// Demo GIFs only: look like a release, even though the demo runs from a local build.
     func showAsRelease() {
         localBuild = nil
+        hasPlaceholderBundleID = false
     }
 
     /// Demo GIFs only: show an install at `phase` without doing one.
