@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-10
+
 ### Fixed
 - Pullse works with many open pull requests. With about 40 or more, fetching them all at
   once ran past GitHub's time limit and the menu showed GitHub's HTTP 504 error page. They
