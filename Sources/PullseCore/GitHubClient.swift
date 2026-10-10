@@ -14,7 +14,14 @@ public enum GitHubError: LocalizedError, Sendable {
         case .notLoggedIn(let detail):
             return "gh is not logged in — run `gh auth login`. (\(detail))"
         case .http(let status, let body):
-            return "GitHub returned HTTP \(status): \(body)"
+            // GitHub's error pages are HTML, which tells the user nothing in the menu.
+            let detail = body.contains("<") ? "" : ": \(body)"
+            switch status {
+            case 502, 503, 504:
+                return "GitHub timed out or is unavailable (HTTP \(status)). Pullse tries again at the next check."
+            default:
+                return "GitHub returned HTTP \(status)\(detail)"
+            }
         case .graphQL(let messages):
             return "GitHub GraphQL error: \(messages.joined(separator: "; "))"
         case .badResponse(let detail):
@@ -41,9 +48,13 @@ public actor GitHubClient {
 
     /// Fetch everything one poll needs. `mentionsSince` nil skips the mentions query.
     public func snapshot(org: String, mentionsSince: Date?) async throws -> Snapshot {
-        let mine: MyPullRequestsData = try await graphQL(
-            Queries.myPullRequests, variables: ["q": Queries.myPullRequestsSearch(org: org)]
-        )
+        let search = Queries.myPullRequestsSearch(org: org)
+        let mine = try await Self.myPullRequests(limit: Queries.myPullRequestsLimit) { after in
+            var variables = ["q": search]
+            variables["after"] = after
+            let page: MyPullRequestsData = try await self.graphQL(Queries.myPullRequests, variables: variables)
+            return page
+        }
         var mentioned: [PullRequest] = []
         if let since = mentionsSince {
             let data: MentionsData = try await graphQL(
@@ -52,10 +63,33 @@ public actor GitHubClient {
             mentioned = data.search.pullRequests
         }
         return Snapshot(
-            login: mine.viewer.login,
-            myPullRequests: mine.search.pullRequests,
+            login: mine.login,
+            myPullRequests: mine.pullRequests,
             mentionedPullRequests: mentioned
         )
+    }
+
+    /// Pages through `fetch` (given the cursor to start after, nil for the first page)
+    /// until there are no more or `limit` is reached. A PR that moved to the next page
+    /// between two requests is kept once.
+    static func myPullRequests(
+        limit: Int, fetch: @Sendable (String?) async throws -> MyPullRequestsData
+    ) async throws -> (login: String, pullRequests: [PullRequest]) {
+        var login = ""
+        var pullRequests: [PullRequest] = []
+        var ids: Set<String> = []
+        var after: String?
+        repeat {
+            let page = try await fetch(after)
+            login = page.viewer.login
+            for pr in page.search.pullRequests where ids.insert(pr.id).inserted {
+                pullRequests.append(pr)
+            }
+            guard let info = page.search.pageInfo, info.hasNextPage, let cursor = info.endCursor
+            else { break }
+            after = cursor
+        } while pullRequests.count < limit
+        return (login, Array(pullRequests.prefix(limit)))
     }
 
     /// Releases of `repository` ("owner/name"), newest first.

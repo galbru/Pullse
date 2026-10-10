@@ -8,6 +8,13 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Fixed
+- Pullse works with many open pull requests. With about 40 or more, fetching them all at
+  once ran past GitHub's time limit and the menu showed GitHub's HTTP 504 error page. They
+  are now fetched 15 at a time, up to 100 (it used to stop at 50).
+- A GitHub error in the menu is now one short line, not the start of GitHub's HTML error
+  page.
+
 ## [0.11.1] - 2026-10-08
 
 ### Fixed
