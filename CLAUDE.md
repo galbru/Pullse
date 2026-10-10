@@ -57,8 +57,10 @@ Two targets. `PullseCore` has no AppKit or SwiftUI and holds all the logic under
 **One poll** (`AppModel.fetchAndNotify`):
 1. `SettingsModel.reloadIfChanged()` re-reads `~/.config/pullse/settings.json` when its
    modification date changes. It stops the poll if there's no org or the file won't parse.
-2. `GitHubClient.snapshot` makes 1–2 GraphQL requests using the token from `gh auth
-   token`. The client looks for `gh` in Homebrew paths first, because GUI apps don't get
+2. `GitHubClient.snapshot` makes GraphQL requests using the token from `gh auth
+   token`: the user's open PRs a page of 15 at a time (up to 100), then one for mentions.
+   GitHub gives a query about 10 seconds and each PR with its conversation and checks
+   costs a fraction of one, so a single request for 40+ PRs timed out with HTTP 504. The client looks for `gh` in Homebrew paths first, because GUI apps don't get
    the shell's PATH. On a 401 it drops the cached token and retries once. Query text is in
    `Queries.swift`.
 3. `EventDetector.detect(snapshot, state:, settings:, now:)` is pure (no I/O, no clock) and

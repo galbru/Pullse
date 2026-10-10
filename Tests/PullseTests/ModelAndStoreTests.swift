@@ -99,7 +99,7 @@ import Testing
 }
 
 @Test func searchQueries() {
-    #expect(Queries.myPullRequestsSearch(org: "acme") == "is:pr is:open author:@me org:acme")
+    #expect(Queries.myPullRequestsSearch(org: "acme") == "is:pr is:open author:@me org:acme sort:created-desc")
     let since = Date(timeIntervalSince1970: 1_790_000_000)
     #expect(Queries.mentionsSearch(org: "acme", since: since)
         == "is:pr mentions:@me -author:@me org:acme updated:>=2026-09-21T14:13:20Z")

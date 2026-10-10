@@ -164,8 +164,15 @@ struct SearchNode: Decodable, Sendable {
 
 struct SearchResult: Decodable, Sendable {
     let nodes: [SearchNode?]
+    /// Only requested where results are paged.
+    var pageInfo: PageInfo? = nil
 
     var pullRequests: [PullRequest] { nodes.compactMap { $0?.pullRequest } }
+}
+
+struct PageInfo: Decodable, Sendable {
+    let hasNextPage: Bool
+    let endCursor: String?
 }
 
 struct Viewer: Decodable, Sendable {

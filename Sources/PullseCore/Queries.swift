@@ -23,13 +23,21 @@ enum Queries {
     }
     """
 
-    /// Every open PR I authored in the org, with its conversation, its draft and review
-    /// status, and the check rollup of its head commit — one request no matter how many
-    /// repos or PRs.
+    /// Open PRs I authored in the org, with their conversation, draft and review status,
+    /// and the check rollup of the head commit, one page at a time. GitHub gives a query
+    /// about 10 seconds and each PR costs about a quarter of one, so a page of 50 timed out
+    /// (HTTP 504) for someone with 40 or more open PRs.
+    static let myPullRequestsPageSize = 15
+
+    /// Stop after this many, so someone with hundreds of open PRs doesn't make every poll
+    /// a dozen requests.
+    static let myPullRequestsLimit = 100
+
     static let myPullRequests = """
-    query($q: String!) {
+    query($q: String!, $after: String) {
       viewer { login }
-      search(query: $q, type: ISSUE, first: 50) {
+      search(query: $q, type: ISSUE, first: \(myPullRequestsPageSize), after: $after) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           ... on PullRequest {
             ...ConversationFields
@@ -66,7 +74,8 @@ enum Queries {
     """ + fragments
 
     static func myPullRequestsSearch(org: String) -> String {
-        "is:pr is:open author:@me org:\(org)"
+        // A fixed order, so a PR doesn't move between pages from one request to the next.
+        "is:pr is:open author:@me org:\(org) sort:created-desc"
     }
 
     static func mentionsSearch(org: String, since: Date) -> String {
