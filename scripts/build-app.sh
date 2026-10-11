@@ -12,6 +12,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Pullse"
 cp Support/Info.plist "$APP/Contents/Info.plist"
+scripts/make-icon.sh "$APP/Contents/Resources/AppIcon.icns"
 
 # The bundle id is personal (macOS keys notification permission and login items by it),
 # so it isn't committed: $BUNDLE_ID, else "bundleIdentifier" in the settings file, else
