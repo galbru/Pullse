@@ -330,13 +330,10 @@ struct DemoBanner: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(LinearGradient(colors: [Color(red: 0.25, green: 0.55, blue: 1), Color(red: 0.18, green: 0.38, blue: 0.9)],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: 38, height: 38)
-                .overlay(Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white))
+            // The demo runs from the built bundle, so this is the real app icon.
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 40, height: 40)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)

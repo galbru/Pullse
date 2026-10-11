@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" width="96" alt="Pullse logo: a heartbeat line between two commits">
+
 # Pullse
 
 [![Build](../../actions/workflows/release.yml/badge.svg?branch=main)](../../actions/workflows/release.yml)
