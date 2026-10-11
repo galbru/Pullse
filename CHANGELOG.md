@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-11
+
 ### Added
 
 - An app icon, a heartbeat line between two commits, on notifications and in Finder.
