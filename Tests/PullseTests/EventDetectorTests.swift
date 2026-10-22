@@ -67,6 +67,25 @@ import Testing
     #expect(detect(snap, settings: muted).isEmpty)
 }
 
+@Test func ignoredDraftsAreSilentAndNotReplayedWhenMarkedReady() throws {
+    let draft = try snapshot(mine: [pr(
+        comments: [comment("c1")],
+        checks: [checkRun("k1", name: "test", conclusion: "FAILURE")], isDraft: true
+    )])
+    var ignore = DetectorSettings()
+    ignore.ignoreDrafts = true
+    let (events, state) = EventDetector.detect(draft, state: polled, settings: ignore, now: now)
+    #expect(events.isEmpty)
+    #expect(state.seen["c1"] != nil)
+    // Marked ready: what happened while it was a draft stays skipped.
+    let ready = try snapshot(mine: [pr(
+        comments: [comment("c1")], checks: [checkRun("k1", name: "test", conclusion: "FAILURE")]
+    )])
+    #expect(EventDetector.detect(ready, state: state, settings: ignore, now: now).events.isEmpty)
+    // Off, a draft notifies like any other pull request.
+    #expect(detect(draft).count == 2)
+}
+
 @Test func reviews() throws {
     let snap = try snapshot(mine: [pr(reviews: [
         review("r1", state: "APPROVED"),

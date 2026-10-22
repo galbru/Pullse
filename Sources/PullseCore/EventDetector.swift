@@ -13,6 +13,7 @@ public struct DetectorSettings: Sendable {
     public var includeBots = false
     /// Repo names, either `owner/name` or bare `name`, compared case-insensitively.
     public var mutedRepos: Set<String> = []
+    public var ignoreDrafts = false
     public var enabledConditions: Set<PRCondition> = Set(PRCondition.allCases)
 
     public init() {}
@@ -31,6 +32,12 @@ public struct DetectorSettings: Sendable {
     public func isMuted(nameWithOwner: String) -> Bool {
         let name = nameWithOwner.split(separator: "/").last.map(String.init) ?? nameWithOwner
         return mutedRepos.contains(nameWithOwner.lowercased()) || mutedRepos.contains(name.lowercased())
+    }
+
+    /// One of my pull requests whose activity is dropped: in a muted repo, or a draft
+    /// while drafts are ignored.
+    func isSilenced(_ pr: PullRequest) -> Bool {
+        isMuted(pr.repository) || (ignoreDrafts && pr.isDraft == true)
     }
 }
 
@@ -108,7 +115,7 @@ public enum EventDetector {
         var events: [PREvent] = []
 
         for pr in snapshot.myPullRequests {
-            let muted = settings.isMuted(pr.repository)
+            let muted = settings.isSilenced(pr)
 
             for comment in pr.comments.items + pr.reviewComments {
                 guard isNew(comment.id, at: comment.date),
@@ -199,13 +206,13 @@ public enum EventDetector {
         }
 
         let active = PRConditions.active(for: snapshot.myPullRequests)
-        // Computed from the pull requests alone, never from the settings: a muted repo
-        // or a switched-off condition is still tracked, so turning it back on can't
-        // replay a state the user already lived through.
+        // Computed from the pull requests alone, never from the settings: a muted repo,
+        // an ignored draft or a switched-off condition is still tracked, so turning it
+        // back on can't replay a state the user already lived through.
         let fired = active.subtracting(state.activeConditions ?? [])
         if !firstRun, state.activeConditions != nil {
             for pr in snapshot.myPullRequests {
-                let muted = settings.isMuted(pr.repository)
+                let muted = settings.isSilenced(pr)
                 for rule in PRConditions.rules
                 where fired.contains(PRConditions.key(rule.condition, pr: pr)) {
                     guard settings.enabledConditions.contains(rule.condition), !muted else { continue }

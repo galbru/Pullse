@@ -78,7 +78,7 @@ enum Demo {
     private static func settingsFrames() throws -> [Frame] {
         func window(_ tab: SettingsTab, cursor: CGPoint, click: Bool = false) throws -> AnyView {
             let model = try Capture.sampleModel()
-            return AnyView(DemoCanvas(size: CGSize(width: 700, height: 600), cursor: cursor, click: click) {
+            return AnyView(DemoCanvas(size: CGSize(width: 700, height: 650), cursor: cursor, click: click) {
                 Capture.popover(SettingsView(model: model, tab: tab))
                     .fixedSize()
                     .offset(x: 20, y: 20)

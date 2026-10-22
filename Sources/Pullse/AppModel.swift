@@ -19,7 +19,7 @@ final class AppModel {
     var unreadCount: Int { history.filter(\.isUnread).count }
 
     /// The open PRs to show: none from another org (the org was just changed and not polled
-    /// yet), and none from muted repositories.
+    /// yet), none from muted repositories, and no drafts when they're ignored.
     var openPRs: [OpenPullRequest] {
         guard let polled = polledOpenPRs, polled.org == settings.current.organization else { return [] }
         return ActivityGroups.visible(polled.prs, settings: settings.current.detectorSettings)

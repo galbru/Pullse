@@ -8,6 +8,11 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Added
+- An "Ignore draft pull requests" filter under Settings → Filters. While it's on, your
+  draft pull requests send no notifications and aren't listed in the menu. Activity on a
+  draft is skipped, not saved for later, so marking it ready doesn't replay it.
+
 ## [0.12.0] - 2026-10-11
 
 ### Added
