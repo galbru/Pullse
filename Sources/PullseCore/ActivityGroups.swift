@@ -98,8 +98,9 @@ public enum ActivityGroups {
         return active + quiet
     }
 
-    /// The open PRs the menu lists: those outside muted repositories, in the order given.
+    /// The open PRs the menu lists: those outside muted repositories, and not drafts when
+    /// drafts are ignored, in the order given.
     public static func visible(_ open: [OpenPullRequest], settings: DetectorSettings) -> [OpenPullRequest] {
-        open.filter { !settings.isMuted(nameWithOwner: $0.repo) }
+        open.filter { !settings.isMuted(nameWithOwner: $0.repo) && !(settings.ignoreDrafts && $0.isDraft) }
     }
 }

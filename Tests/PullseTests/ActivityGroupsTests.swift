@@ -105,6 +105,14 @@ func reviewDecisionBecomesTheReviewChip(decision: String, expected: OpenPullRequ
     #expect(ActivityGroups.visible(open, settings: settings).map(\.prLabel) == ["api#1", "legacy#4"])
 }
 
+@Test func draftsAreHiddenOnlyWhenIgnored() throws {
+    let open = try [openPR(pr(number: 1)), openPR(pr(number: 2, isDraft: true))]
+    var settings = DetectorSettings()
+    #expect(ActivityGroups.visible(open, settings: settings).map(\.prLabel) == ["api#1", "api#2"])
+    settings.ignoreDrafts = true
+    #expect(ActivityGroups.visible(open, settings: settings).map(\.prLabel) == ["api#1"])
+}
+
 @Test func aHeadingOpensItsPullRequestOrElseItsNewestEventsLink() throws {
     let open = try openPR(pr(number: 1))
     let groups = ActivityGroups.build(history: [], open: [open])

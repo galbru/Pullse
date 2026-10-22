@@ -14,6 +14,8 @@ public struct PullseSettings: Codable, Equatable, Sendable {
     public var ciResults: DetectorSettings.CIMode = .failuresOnly
     public var includeBots = false
     public var mutedRepos: [String] = []
+    /// My draft pull requests neither notify nor show in the menu until marked ready.
+    public var ignoreDrafts = false
     /// List every open PR of mine in the menu, with its CI and review status, even when
     /// it has no new activity.
     public var showOpenPullRequests = false
@@ -52,6 +54,7 @@ public struct PullseSettings: Codable, Equatable, Sendable {
         ciResults = try c.decodeIfPresent(DetectorSettings.CIMode.self, forKey: .ciResults) ?? d.ciResults
         includeBots = try c.decodeIfPresent(Bool.self, forKey: .includeBots) ?? d.includeBots
         mutedRepos = try c.decodeIfPresent([String].self, forKey: .mutedRepos) ?? d.mutedRepos
+        ignoreDrafts = try c.decodeIfPresent(Bool.self, forKey: .ignoreDrafts) ?? d.ignoreDrafts
         showOpenPullRequests = try c.decodeIfPresent(Bool.self, forKey: .showOpenPullRequests) ?? d.showOpenPullRequests
         // A hand-edited shortcut that doesn't decode is treated as none, not as a broken file.
         openMenuShortcut = (try? c.decodeIfPresent(HotKey.self, forKey: .openMenuShortcut)) ?? nil
@@ -90,6 +93,7 @@ public struct PullseSettings: Codable, Equatable, Sendable {
         s.ciMode = ciResults
         s.includeBots = includeBots
         s.mutedRepos = DetectorSettings.parseRepoList(mutedRepos.joined(separator: ","))
+        s.ignoreDrafts = ignoreDrafts
         s.enabledConditions = Set(PRCondition.allCases.filter(isEnabled))
         return s
     }

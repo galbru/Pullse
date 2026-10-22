@@ -21,6 +21,7 @@ private func write(_ text: String, to file: SettingsFile) throws {
     #expect(settings.organization == nil)
     #expect(settings.bundleIdentifier == nil)
     #expect(settings.mutedRepos.isEmpty)
+    #expect(!settings.ignoreDrafts)
 }
 
 @Test func missingFileIsTheDefaults() throws {
@@ -41,6 +42,7 @@ private func write(_ text: String, to file: SettingsFile) throws {
     settings.ciResults = .all
     settings.includeBots = true
     settings.mutedRepos = ["sandbox", "acme/legacy"]
+    settings.ignoreDrafts = true
     settings.bundleIdentifier = "com.example.test"
     try file.save(settings)  // creates the missing directories
     #expect(try file.load() == settings)
@@ -121,6 +123,7 @@ private func write(_ text: String, to file: SettingsFile) throws {
     settings.ciResults = .all
     settings.includeBots = true
     settings.mutedRepos = ["Sandbox", "Acme/Legacy, docs"]
+    settings.ignoreDrafts = true
     let detector = settings.detectorSettings
     #expect(!detector.comments)
     #expect(!detector.reviews)
@@ -129,4 +132,5 @@ private func write(_ text: String, to file: SettingsFile) throws {
     #expect(detector.ciMode == .all)
     #expect(detector.includeBots)
     #expect(detector.mutedRepos == ["sandbox", "acme/legacy", "docs"])
+    #expect(detector.ignoreDrafts)
 }

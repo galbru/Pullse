@@ -182,13 +182,14 @@ struct SettingsView: View {
 
         Section {
             Toggle("Include bots", isOn: settings.binding(\.includeBots))
+            Toggle("Ignore draft pull requests", isOn: settings.binding(\.ignoreDrafts))
             TextField("Muted repositories", text: mutedText.projectedValue,
                       prompt: Text("sandbox, your-org/legacy-app"))
                 .onSubmit(applyText)
         } header: {
             Text("Filters")
         } footer: {
-            Footnote("Bots are accounts like github-actions or dependabot. Muted repositories are comma separated, as a name or owner/name.")
+            Footnote("Bots are accounts like github-actions or dependabot. Your drafts, when ignored, stay quiet and off the menu until marked ready. Muted repositories are comma separated, as a name or owner/name.")
         }
 
         Section {
