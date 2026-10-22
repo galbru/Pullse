@@ -186,14 +186,14 @@ environment variable overrides it; with neither, builds use `com.example.pullse`
 
 ## How it decides what's new
 
-Every poll (default: every minute) makes one GraphQL request for your open PRs in the org,
-plus a second one for recent PRs that mention you. It fetches their comments, reviews,
+Every poll (default: every minute) makes GraphQL requests for your open PRs in the org,
+plus one for recent PRs that mention you. It fetches their comments, reviews,
 review threads and the head commit's checks. An item gets a notification only when:
 
 1. it hasn't been seen before, **and**
 2. it happened after the previous poll (with 5 minutes of slack for search-index lag).
 
-Rule 2 is why a first launch, a PR that just showed up in the search, or turning an event
+Rule 2 is why a first launch, a newly opened PR, or turning an event
 type back on never floods you with old history. After the Mac has been asleep you get what
 happened while it slept, and more than 5 events at once are combined into one summary
 notification.

@@ -8,6 +8,13 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Fixed
+- Open pull requests no longer disappear from the menu between checks. GitHub's search
+  sometimes left whole repositories out of its results, so a pull request could vanish
+  until the next refresh, the menu could show "Nothing yet", and new activity on it could
+  go unnotified. Pullse now lists your open pull requests from your account instead of
+  searching for them.
+
 ## [0.13.0] - 2026-10-22
 
 ### Added

@@ -22,12 +22,11 @@ import Testing
 
 @Test func partialDataWithErrorsIsStillUsed() throws {
     let json = try JSONSerialization.data(withJSONObject: [
-        "data": ["viewer": ["login": "me"], "search": ["nodes": [pr()]]],
+        "data": ["nodes": [NSNull(), pr()]],
         "errors": [["message": "Resource not accessible by integration"]],
     ])
     let data: MyPullRequestsData = try GitHubClient.decode(json)
-    #expect(data.viewer.login == "me")
-    #expect(data.search.pullRequests.count == 1)
+    #expect(data.pullRequests.count == 1)
 }
 
 @Test func malformedResponseIsABadResponse() {
@@ -98,8 +97,7 @@ import Testing
     #expect(event.isUnread)
 }
 
-@Test func searchQueries() {
-    #expect(Queries.myPullRequestsSearch(org: "acme") == "is:pr is:open author:@me org:acme sort:created-desc")
+@Test func mentionsSearchQuery() {
     let since = Date(timeIntervalSince1970: 1_790_000_000)
     #expect(Queries.mentionsSearch(org: "acme", since: since)
         == "is:pr mentions:@me -author:@me org:acme updated:>=2026-09-21T14:13:20Z")
@@ -168,7 +166,7 @@ private func temporaryStore() -> StateStore {
 
 @Test func everyQueryIsReadOnly() {
     // Pullse must never change anything on GitHub: no GraphQL mutations.
-    for query in [Queries.myPullRequests, Queries.mentions] {
+    for query in [Queries.myOpenPullRequestIDs, Queries.myPullRequests, Queries.mentions] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(trimmed.hasPrefix("query"))
         #expect(!query.contains("mutation"))
