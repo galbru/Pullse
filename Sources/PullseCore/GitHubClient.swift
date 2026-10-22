@@ -48,13 +48,21 @@ public actor GitHubClient {
 
     /// Fetch everything one poll needs. `mentionsSince` nil skips the mentions query.
     public func snapshot(org: String, mentionsSince: Date?) async throws -> Snapshot {
-        let search = Queries.myPullRequestsSearch(org: org)
-        let mine = try await Self.myPullRequests(limit: Queries.myPullRequestsLimit) { after in
-            var variables = ["q": search]
-            variables["after"] = after
-            let page: MyPullRequestsData = try await self.graphQL(Queries.myPullRequests, variables: variables)
-            return page
-        }
+        let mine = try await Self.myPullRequests(
+            org: org, limit: Queries.myPullRequestsLimit, pageSize: Queries.myPullRequestsPageSize,
+            ids: { after in
+                let page: MyOpenPullRequestIDsData = try await self.graphQL(
+                    Queries.myOpenPullRequestIDs, variables: after.map { ["after": $0] } ?? [:]
+                )
+                return page
+            },
+            details: { ids in
+                let page: MyPullRequestsData = try await self.graphQL(
+                    Queries.myPullRequests, variables: ["ids": ids]
+                )
+                return page
+            }
+        )
         var mentioned: [PullRequest] = []
         if let since = mentionsSince {
             let data: MentionsData = try await graphQL(
@@ -69,27 +77,38 @@ public actor GitHubClient {
         )
     }
 
-    /// Pages through `fetch` (given the cursor to start after, nil for the first page)
-    /// until there are no more or `limit` is reached. A PR that moved to the next page
-    /// between two requests is kept once.
+    /// Lists the ids of my open PRs through `ids` (given the cursor to start after, nil
+    /// for the first page), keeps the first `limit` in `org`, then fetches them in full
+    /// through `details`, `pageSize` at a time. A PR listed on two pages (one opened
+    /// between the requests pushes the rest down) is kept once.
     static func myPullRequests(
-        limit: Int, fetch: @Sendable (String?) async throws -> MyPullRequestsData
+        org: String, limit: Int, pageSize: Int,
+        ids: @Sendable (String?) async throws -> MyOpenPullRequestIDsData,
+        details: @Sendable ([String]) async throws -> MyPullRequestsData
     ) async throws -> (login: String, pullRequests: [PullRequest]) {
         var login = ""
-        var pullRequests: [PullRequest] = []
-        var ids: Set<String> = []
+        var wanted: [String] = []
         var after: String?
         repeat {
-            let page = try await fetch(after)
+            let page = try await ids(after)
             login = page.viewer.login
-            for pr in page.search.pullRequests where ids.insert(pr.id).inserted {
-                pullRequests.append(pr)
+            for node in page.viewer.pullRequests.nodes.compactMap({ $0 })
+            where node.repository.owner.login.caseInsensitiveCompare(org) == .orderedSame
+                && !wanted.contains(node.id) {
+                wanted.append(node.id)
             }
-            guard let info = page.search.pageInfo, info.hasNextPage, let cursor = info.endCursor
-            else { break }
+            let info = page.viewer.pullRequests.pageInfo
+            guard info.hasNextPage, let cursor = info.endCursor else { break }
             after = cursor
-        } while pullRequests.count < limit
-        return (login, Array(pullRequests.prefix(limit)))
+        } while wanted.count < limit
+        wanted = Array(wanted.prefix(limit))
+
+        var pullRequests: [PullRequest] = []
+        for start in stride(from: 0, to: wanted.count, by: pageSize) {
+            let chunk = Array(wanted[start..<min(start + pageSize, wanted.count)])
+            pullRequests += try await details(chunk).pullRequests
+        }
+        return (login, pullRequests)
     }
 
     /// Releases of `repository` ("owner/name"), newest first.
@@ -117,7 +136,7 @@ public actor GitHubClient {
         }
     }
 
-    func graphQL<T: Decodable>(_ query: String, variables: [String: String]) async throws -> T {
+    func graphQL<T: Decodable>(_ query: String, variables: [String: any Sendable]) async throws -> T {
         let data = try await withTokenRetry { token in
             try await self.send(query, variables: variables, token: token)
         }
@@ -155,7 +174,7 @@ public actor GitHubClient {
         return data
     }
 
-    private func send(_ query: String, variables: [String: String], token: String) async throws -> Data {
+    private func send(_ query: String, variables: [String: any Sendable], token: String) async throws -> Data {
         var request = URLRequest(url: URL(string: "https://api.github.com/graphql")!)
         request.httpMethod = "POST"
         request.setValue("bearer \(token)", forHTTPHeaderField: "Authorization")

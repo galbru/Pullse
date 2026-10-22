@@ -23,10 +23,26 @@ enum Queries {
     }
     """
 
-    /// Open PRs I authored in the org, with their conversation, draft and review status,
-    /// and the check rollup of the head commit, one page at a time. GitHub gives a query
-    /// about 10 seconds and each PR costs about a quarter of one, so a page of 50 timed out
-    /// (HTTP 504) for someone with 40 or more open PRs.
+    /// The ids of every open PR I authored, newest first, with the owner that picks out
+    /// the org's. Listed from my account rather than searched: GitHub's search index
+    /// sometimes leaves whole repositories out of a response, with no error and the
+    /// right total, so PRs blinked out of the menu and activity on them went unreported.
+    static let myOpenPullRequestIDs = """
+    query($after: String) {
+      viewer {
+        login
+        pullRequests(states: OPEN, first: 100, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) {
+          pageInfo { hasNextPage endCursor }
+          nodes { id repository { owner { login } } }
+        }
+      }
+    }
+    """
+
+    /// Those PRs in full, with their conversation, draft and review status, and the check
+    /// rollup of the head commit, a few ids at a time. GitHub gives a query about 10
+    /// seconds and each PR costs about a quarter of one, so 50 at once timed out (HTTP
+    /// 504) for someone with 40 or more open PRs.
     static let myPullRequestsPageSize = 15
 
     /// Stop after this many, so someone with hundreds of open PRs doesn't make every poll
@@ -34,25 +50,21 @@ enum Queries {
     static let myPullRequestsLimit = 100
 
     static let myPullRequests = """
-    query($q: String!, $after: String) {
-      viewer { login }
-      search(query: $q, type: ISSUE, first: \(myPullRequestsPageSize), after: $after) {
-        pageInfo { hasNextPage endCursor }
-        nodes {
-          ... on PullRequest {
-            ...ConversationFields
-            isDraft reviewDecision mergeable
-            commits(last: 1) {
-              nodes {
-                commit {
-                  statusCheckRollup {
-                    state
-                    contexts(first: 100) {
-                      nodes {
-                        __typename
-                        ... on CheckRun { id name status conclusion completedAt detailsUrl }
-                        ... on StatusContext { id context state targetUrl createdAt }
-                      }
+    query($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on PullRequest {
+          ...ConversationFields
+          isDraft reviewDecision mergeable
+          commits(last: 1) {
+            nodes {
+              commit {
+                statusCheckRollup {
+                  state
+                  contexts(first: 100) {
+                    nodes {
+                      __typename
+                      ... on CheckRun { id name status conclusion completedAt detailsUrl }
+                      ... on StatusContext { id context state targetUrl createdAt }
                     }
                   }
                 }
@@ -72,11 +84,6 @@ enum Queries {
       }
     }
     """ + fragments
-
-    static func myPullRequestsSearch(org: String) -> String {
-        // A fixed order, so a PR doesn't move between pages from one request to the next.
-        "is:pr is:open author:@me org:\(org) sort:created-desc"
-    }
 
     static func mentionsSearch(org: String, since: Date) -> String {
         let stamp = ISO8601DateFormatter().string(from: since)

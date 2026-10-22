@@ -152,8 +152,9 @@ public struct PullRequest: Decodable, Sendable {
     }
 }
 
-/// A search result node. Search can in principle return non-PR nodes (as `{}`), so a
-/// node that doesn't decode as a PullRequest is dropped rather than failing the poll.
+/// A search result node, or one looked up by id. Either can in principle be something
+/// other than a PR (as `{}`), so a node that doesn't decode as a PullRequest is dropped
+/// rather than failing the poll.
 struct SearchNode: Decodable, Sendable {
     let pullRequest: PullRequest?
 
@@ -164,8 +165,6 @@ struct SearchNode: Decodable, Sendable {
 
 struct SearchResult: Decodable, Sendable {
     let nodes: [SearchNode?]
-    /// Only requested where results are paged.
-    var pageInfo: PageInfo? = nil
 
     var pullRequests: [PullRequest] { nodes.compactMap { $0?.pullRequest } }
 }
@@ -175,13 +174,32 @@ struct PageInfo: Decodable, Sendable {
     let endCursor: String?
 }
 
-struct Viewer: Decodable, Sendable {
-    let login: String
+/// One page of `Queries.myOpenPullRequestIDs`.
+struct MyOpenPullRequestIDsData: Decodable, Sendable {
+    struct Owner: Decodable, Sendable { let login: String }
+    struct Repository: Decodable, Sendable { let owner: Owner }
+    struct Node: Decodable, Sendable {
+        let id: String
+        let repository: Repository
+    }
+    struct Page: Decodable, Sendable {
+        let pageInfo: PageInfo
+        let nodes: [Node?]
+    }
+    struct Viewer: Decodable, Sendable {
+        let login: String
+        let pullRequests: Page
+    }
+
+    let viewer: Viewer
 }
 
+/// `Queries.myPullRequests`: the PRs asked for by id, in that order. An id that no longer
+/// resolves (the PR was deleted since it was listed) comes back null and is dropped.
 struct MyPullRequestsData: Decodable, Sendable {
-    let viewer: Viewer
-    let search: SearchResult
+    let nodes: [SearchNode?]
+
+    var pullRequests: [PullRequest] { nodes.compactMap { $0?.pullRequest } }
 }
 
 struct MentionsData: Decodable, Sendable {
