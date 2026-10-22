@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-22
+
 ### Added
 - An "Ignore draft pull requests" filter under Settings → Filters. While it's on, your
   draft pull requests send no notifications and aren't listed in the menu. Activity on a
