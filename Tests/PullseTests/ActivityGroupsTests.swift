@@ -85,12 +85,12 @@ func reviewDecisionBecomesTheReviewChip(decision: String, expected: OpenPullRequ
     #expect(ActivityGroups.build(history: [], open: [open, open]).count == 1)
 }
 
-@Test func openPullRequestsAreHiddenByDefault() throws {
-    #expect(!PullseSettings().showOpenPullRequests)
+@Test func openPullRequestsAreShownByDefault() throws {
+    #expect(PullseSettings().showOpenPullRequests)
     let decoded = try JSONDecoder().decode(PullseSettings.self, from: Data(#"{ "org": "acme" }"#.utf8))
-    #expect(!decoded.showOpenPullRequests)
-    let on = try JSONDecoder().decode(PullseSettings.self, from: Data(#"{ "showOpenPullRequests": true }"#.utf8))
-    #expect(on.showOpenPullRequests)
+    #expect(decoded.showOpenPullRequests)
+    let off = try JSONDecoder().decode(PullseSettings.self, from: Data(#"{ "showOpenPullRequests": false }"#.utf8))
+    #expect(!off.showOpenPullRequests)
 }
 
 @Test func openPullRequestsInMutedRepositoriesAreHidden() throws {

@@ -18,9 +18,9 @@ GitHub pull requests in an organization you choose:
 You can turn each of these on or off, and bots (github-actions, Terraform plan bots,
 dependabot, …) are muted by default. Clicking a notification opens the comment, review or
 check. The menu bar icon shows an unread count, and its popover lists recent activity
-grouped by PR. Turn on **Show open pull requests in the menu** (Settings → Notifications)
-to also list every open PR you authored, with its CI and review status, even when nothing
-new has happened on it. Right-click the icon for About (the GitHub repository), Settings
+grouped by PR. It also lists every open PR you authored, with its CI and review status,
+even when nothing new has happened on it; turn off **Show open pull requests in the menu**
+(Settings → Notifications) to list only activity. Right-click the icon for About (the GitHub repository), Settings
 and Quit.
 
 Pullse works from the keyboard too. Record a shortcut in Settings → App → Keyboard to open
@@ -165,7 +165,7 @@ edits it, and changes made by hand are picked up on the next check.
   "ciResults": "failuresOnly",
   "includeBots": false,
   "mutedRepos": ["sandbox", "your-org/legacy-app"],
-  "showOpenPullRequests": false,
+  "showOpenPullRequests": true,
   "openMenuShortcut": { "keyCode": 35, "key": "P", "modifiers": ["control", "option"] },
   "checkForUpdates": true,
   "autoUpdate": false,

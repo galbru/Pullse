@@ -8,6 +8,11 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Changed
+- New installs list your open pull requests in the menu from the start ("Show open pull
+  requests in the menu" is now on by default), so the menu no longer counts open pull
+  requests it doesn't show. A settings file that already has the setting keeps its value.
+
 ## [0.13.1] - 2026-10-22
 
 ### Fixed
