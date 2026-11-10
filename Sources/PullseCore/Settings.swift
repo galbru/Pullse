@@ -18,7 +18,7 @@ public struct PullseSettings: Codable, Equatable, Sendable {
     public var ignoreDrafts = false
     /// List every open PR of mine in the menu, with its CI and review status, even when
     /// it has no new activity.
-    public var showOpenPullRequests = false
+    public var showOpenPullRequests = true
     /// Opens and closes the menu from any app. None until the user records one.
     public var openMenuShortcut: HotKey?
     /// Pull request states to notify about, keyed by `PRCondition` raw value. A key
