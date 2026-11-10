@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-10
+
 ### Changed
 - New installs list your open pull requests in the menu from the start ("Show open pull
   requests in the menu" is now on by default), so the menu no longer counts open pull
