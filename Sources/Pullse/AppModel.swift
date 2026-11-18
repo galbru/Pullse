@@ -55,7 +55,7 @@ final class AppModel {
 
     /// Demo GIFs only: show a finished poll without talking to GitHub.
     func showAsPolled(openPRs: [OpenPullRequest], at date: Date) {
-        polledOpenPRs = (settings.current.organization ?? "", openPRs)
+        polledOpenPRs = (settings.current.organization ?? "", Stacks.assign(openPRs))
         lastPoll = date
         lastError = nil
     }
@@ -150,7 +150,9 @@ final class AppModel {
             state.seen = seen
             state.record(events)
             history = state.history
-            polledOpenPRs = (org, snapshot.myPullRequests.map(OpenPullRequest.init))
+            // Stacks are found before muted repos and ignored drafts are hidden, so a PR
+            // keeps its place in a stack when one below it isn't shown.
+            polledOpenPRs = (org, Stacks.assign(snapshot.myPullRequests.map(OpenPullRequest.init)))
             lastPoll = Date()
             lastError = nil
             save()
@@ -199,9 +201,11 @@ final class AppModel {
                 : updater.hasPlaceholderBundleID ? "download only, built without a bundle id"
                 : "download only, not in an Applications folder"))
             print("Open PRs:")
-            for pr in ActivityGroups.visible(snapshot.myPullRequests.map(OpenPullRequest.init), settings: settings) {
+            let open = Stacks.assign(snapshot.myPullRequests.map(OpenPullRequest.init))
+            for pr in ActivityGroups.visible(open, settings: settings) {
                 let status = [
                     pr.ci.map { "CI \($0)" }, pr.isDraft ? "draft" : pr.review.map { "review \($0)" },
+                    pr.stack.map { "stack \($0.depth)/\($0.height) (\($0.description))" },
                 ].compactMap { $0 }
                 print("  \(pr.prLabel)  \(pr.title.prefix(50))  \(status.isEmpty ? "-" : status.joined(separator: ", "))")
             }

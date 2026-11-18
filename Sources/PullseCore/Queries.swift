@@ -55,6 +55,7 @@ enum Queries {
         ... on PullRequest {
           ...ConversationFields
           isDraft reviewDecision mergeable
+          baseRefName headRefName isCrossRepository
           commits(last: 1) {
             nodes {
               commit {

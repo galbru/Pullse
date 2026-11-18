@@ -77,7 +77,10 @@ Two targets. `PullseCore` has no AppKit or SwiftUI and holds all the logic under
    rollup state), kept in memory only with the org they came from. `AppModel.openPRs`
    shows none for another org and drops muted repos (`ActivityGroups.visible`). With
    `showOpenPullRequests` on, the menu's `ActivityGroups.build` adds the open PRs with no
-   activity after the active groups.
+   activity after the active groups. `Stacks.assign` finds stacks among them (a PR whose
+   base branch is another open PR's head in the same repo, forks excluded) before any are
+   hidden, and `build` keeps a stack's PRs together, bottom first, placed by its newest
+   event (or, with none, its newest opened PR).
 
 **What counts as new** is the heart of the app (`EventDetector`). An item notifies only if
 its id is not in the seen set **and** its timestamp is at or after `lastPollAt − 5 min`. The
