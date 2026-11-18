@@ -8,6 +8,18 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Added
+- Stacked pull requests are marked in the menu. When one of your open pull requests is
+  based on another one's branch, its heading shows where it sits in the stack ("2/3", with
+  the pull requests above and below it on hover). A stack's pull requests are listed together,
+  bottom first, joined by a bracket, where the newest activity on any of them puts the stack.
+
+### Changed
+- An open pull request's status chips (CI, review, draft, stack) are on their own line
+  under its title in the menu, so the title is no longer cut short to make room for them.
+- Checks that are still running show a clock on the CI chip instead of "…".
+- Hovering over a pull request's heading in the menu shows its whole title.
+
 ## [0.14.0] - 2026-11-10
 
 ### Changed

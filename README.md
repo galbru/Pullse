@@ -20,8 +20,9 @@ dependabot, …) are muted by default. Clicking a notification opens the comment
 check. The menu bar icon shows an unread count, and its popover lists recent activity
 grouped by PR. It also lists every open PR you authored, with its CI and review status,
 even when nothing new has happened on it; turn off **Show open pull requests in the menu**
-(Settings → Notifications) to list only activity. Right-click the icon for About (the GitHub repository), Settings
-and Quit.
+(Settings → Notifications) to list only activity. Stacked PRs, each based on the branch
+of the one before it, show their place in the stack ("2/3") and are listed together.
+Right-click the icon for About (the GitHub repository), Settings and Quit.
 
 Pullse works from the keyboard too. Record a shortcut in Settings → App → Keyboard to open
 and close the menu from any app. In the menu, ↑ ↓ move, Return opens the selected item on

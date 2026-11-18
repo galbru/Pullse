@@ -95,21 +95,26 @@ enum Capture {
         return model
     }
 
-    /// The sample user's open PRs: two with activity in `sampleEvents`, one without.
+    /// The sample user's open PRs: two with activity in `sampleEvents`, two without.
+    /// api#415 is stacked on api#412.
     static func sampleOpenPRs(now: Date) -> [OpenPullRequest] {
         func pr(_ repo: String, _ number: Int, _ title: String, daysAgo: Double,
                 draft: Bool = false, ci: OpenPullRequest.CIState?,
-                review: OpenPullRequest.ReviewState?) -> OpenPullRequest {
+                review: OpenPullRequest.ReviewState?,
+                base: String = "main", head: String? = nil) -> OpenPullRequest {
             OpenPullRequest(
                 repo: repo, number: number, title: title,
                 url: "https://github.com/\(repo)/pull/\(number)",
                 createdAt: now.addingTimeInterval(-daysAgo * 86_400),
-                isDraft: draft, ci: ci, review: review
+                isDraft: draft, ci: ci, review: review,
+                baseRef: base, headRef: head ?? "branch-\(number)"
             )
         }
         return [
             pr("acme/api", 412, "Add rate limiting to the public API", daysAgo: 3,
-               ci: .failing, review: .changesRequested),
+               ci: .failing, review: .changesRequested, head: "rate-limit"),
+            pr("acme/api", 415, "Rate limit the webhook endpoints", daysAgo: 2,
+               ci: .passing, review: .required, base: "rate-limit"),
             pr("acme/web", 88, "Dark mode for the dashboard", daysAgo: 5,
                ci: .passing, review: .approved),
             pr("acme/cli", 57, "Add a --json flag to status", daysAgo: 0.1,

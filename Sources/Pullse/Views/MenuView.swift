@@ -45,12 +45,18 @@ struct MenuView: View {
                                     model.open(group)
                                 }
                                 .id(heading)
+                                .modifier(StackLine(
+                                    group: group, joinsAbove: group.stackedWithPrevious, joinsBelow: true, inset: 10
+                                ))
                                 if group.events.isEmpty {
                                     Text("No new activity")
                                         .font(.caption)
                                         .foregroundStyle(.tertiary)
                                         .padding(.leading, 36)
                                         .padding(.vertical, 4)
+                                        .modifier(StackLine(
+                                            group: group, joinsAbove: true, joinsBelow: group.stackedWithNext, inset: 4
+                                        ))
                                 }
                                 ForEach(group.events) { event in
                                     let row = ActivityGroups.eventID(event)
@@ -60,6 +66,10 @@ struct MenuView: View {
                                         model.open(event)
                                     }
                                     .id(row)
+                                    .modifier(StackLine(
+                                        group: group, joinsAbove: true,
+                                        joinsBelow: event.id != group.events.last?.id || group.stackedWithNext, inset: 4
+                                    ))
                                 }
                             }
                         }
@@ -69,6 +79,8 @@ struct MenuView: View {
                         })
                     }
                     .frame(height: min(max(listHeight.wrappedValue, 1), maxListHeight))
+                    // No scroll bar while everything fits.
+                    .scrollIndicators(listHeight.wrappedValue > maxListHeight ? .automatic : .never)
                     .onPreferenceChange(ListHeightKey.self) { listHeight.wrappedValue = $0 }
                     .onChange(of: selection.wrappedValue) { _, row in
                         guard scrollToSelection.wrappedValue, let row else { return }
@@ -431,11 +443,16 @@ private struct GroupHeader: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                Text(group.label).font(.caption.weight(.semibold).monospaced())
-                Text(group.title).font(.caption).lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 4)
-                if let pr = group.open {
+            // The chips get a line of their own under the title, so the title keeps the
+            // menu's width however many there are.
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(group.label).font(.caption.weight(.semibold).monospaced())
+                        .lineLimit(1).fixedSize()
+                    Text(group.title).font(.caption).lineLimit(1).truncationMode(.tail)
+                    Spacer(minLength: 0)
+                }
+                if let pr = group.open, StatusChips.hasAny(pr) {
                     StatusChips(pr: pr)
                 }
             }
@@ -448,20 +465,93 @@ private struct GroupHeader: View {
         }
         .buttonStyle(.plain)
         .onHover(perform: onHover)
-        .help("Open the pull request")
+        // The whole title first, since the heading can cut it short, then the stack. A
+        // tooltip on the title or a chip alone never shows: the button's own one wins.
+        .help(([group.title] + (group.open?.stack.map { ["Stacked: \($0.description)"] } ?? [])
+            + ["Open the pull request"]).joined(separator: "\n"))
     }
 }
 
-/// An open PR's CI and review status, after its title in the group header.
+/// The bracket down the left of the open PRs in one stack, which the menu lists together.
+/// Each row draws its own piece; `inset` keeps the ends level with the first and last text.
+/// The ends turn in, so two stacks listed one after the other read as two brackets rather
+/// than one broken line.
+private struct StackLine: ViewModifier {
+    /// Plain values rather than the group: SwiftUI kept drawing a stale piece of the bracket
+    /// when it was handed the whole group and the stack broke up.
+    let stacked: Bool
+    let joinsAbove: Bool
+    let joinsBelow: Bool
+    /// Room above the first row of a stack, so it doesn't run into the group above it.
+    let gapAbove: Bool
+    let inset: CGFloat
+
+    init(group: ActivityGroups.Group, joinsAbove: Bool, joinsBelow: Bool, inset: CGFloat) {
+        stacked = group.stackedWithPrevious || group.stackedWithNext
+        self.joinsAbove = joinsAbove
+        self.joinsBelow = joinsBelow
+        gapAbove = stacked && !group.stackedWithPrevious && !joinsAbove
+        self.inset = inset
+    }
+
+    func body(content: Content) -> some View {
+        // Always the same views, shown or hidden, so a change redraws them in place.
+        content
+            .overlay(alignment: .leading) {
+                StackBracket(topEnd: !joinsAbove, bottomEnd: !joinsBelow)
+                    .stroke(Color.accentColor.opacity(0.7), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: 6)
+                    .padding(.top, joinsAbove ? 0 : inset)
+                    .padding(.bottom, joinsBelow ? 0 : inset)
+                    .padding(.leading, 4)
+                    .opacity(stacked ? 1 : 0)
+            }
+            .padding(.top, gapAbove ? 6 : 0)
+    }
+}
+
+/// One row's piece of `StackLine`: a vertical line along the left edge, turning right at
+/// the ends of the stack.
+private struct StackBracket: Shape {
+    let topEnd: Bool
+    let bottomEnd: Bool
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let x = rect.minX + 1
+        if topEnd {
+            path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addArc(tangent1End: CGPoint(x: x, y: rect.minY), tangent2End: CGPoint(x: x, y: rect.maxY), radius: 3)
+        } else {
+            path.move(to: CGPoint(x: x, y: rect.minY))
+        }
+        if bottomEnd {
+            path.addArc(tangent1End: CGPoint(x: x, y: rect.maxY), tangent2End: CGPoint(x: rect.maxX, y: rect.maxY), radius: 3)
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        } else {
+            path.addLine(to: CGPoint(x: x, y: rect.maxY))
+        }
+        return path
+    }
+}
+
+/// An open PR's stack position, CI and review status, under its title in the group header.
 private struct StatusChips: View {
     let pr: OpenPullRequest
 
+    static func hasAny(_ pr: OpenPullRequest) -> Bool {
+        pr.stack != nil || pr.ci != nil || pr.isDraft || pr.review != nil
+    }
+
     var body: some View {
         HStack(spacing: 4) {
+            if let stack = pr.stack {
+                chip("\(stack.depth)/\(stack.height)", icon: "square.stack.3d.up", tint: .accentColor)
+            }
             switch pr.ci {
             case .passing: chip("CI", icon: "checkmark", tint: .green)
             case .failing: chip("CI", icon: "xmark", tint: .red)
-            case .running: chip("CI", icon: "ellipsis", tint: .secondary)
+            case .running: chip("CI", icon: "clock", tint: .secondary)
             case nil: EmptyView()
             }
             if pr.isDraft {

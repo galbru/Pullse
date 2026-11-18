@@ -139,6 +139,13 @@ public struct PullRequest: Decodable, Sendable {
     public var reviewDecision: String? = nil
     /// MERGEABLE, CONFLICTING, or UNKNOWN while GitHub is still working it out.
     public var mergeable: String? = nil
+    /// The branch it merges into and the branch it brings, for finding stacks: a PR whose
+    /// base is another of my PRs' head sits on top of it. Only requested for my own PRs.
+    public var baseRefName: String? = nil
+    public var headRefName: String? = nil
+    /// True when the head branch is in a fork, where its name says nothing about the
+    /// base repository's branches.
+    public var isCrossRepository: Bool? = nil
 
     public var checks: [CheckContext] {
         commits?.items.last?.commit.statusCheckRollup?.contexts.items ?? []
