@@ -15,6 +15,8 @@ public struct OpenPullRequest: Sendable, Hashable {
     public let ci: CIState?
     /// Nil when the repository requires no review.
     public let review: ReviewState?
+    /// Waiting in the merge queue, to be merged once its turn comes and checks pass.
+    public let inMergeQueue: Bool
     /// The branch it merges into, and its own branch. Nil when it comes from a fork,
     /// whose branch names say nothing about the base repository's.
     public let baseRef: String?
@@ -26,7 +28,7 @@ public struct OpenPullRequest: Sendable, Hashable {
     public init(
         repo: String, number: Int, title: String, url: String, createdAt: Date,
         isDraft: Bool = false, ci: CIState? = nil, review: ReviewState? = nil,
-        baseRef: String? = nil, headRef: String? = nil
+        baseRef: String? = nil, headRef: String? = nil, inMergeQueue: Bool = false
     ) {
         self.repo = repo
         self.number = number
@@ -38,6 +40,7 @@ public struct OpenPullRequest: Sendable, Hashable {
         self.review = review
         self.baseRef = baseRef
         self.headRef = headRef
+        self.inMergeQueue = inMergeQueue
     }
 
     public init(_ pr: PullRequest) {
@@ -58,7 +61,8 @@ public struct OpenPullRequest: Sendable, Hashable {
         self.init(
             repo: pr.repository.nameWithOwner, number: pr.number, title: pr.title, url: pr.url,
             createdAt: pr.createdAt, isDraft: pr.isDraft ?? false, ci: ci, review: review,
-            baseRef: fromFork ? nil : pr.baseRefName, headRef: fromFork ? nil : pr.headRefName
+            baseRef: fromFork ? nil : pr.baseRefName, headRef: fromFork ? nil : pr.headRefName,
+            inMergeQueue: pr.isInMergeQueue ?? false
         )
     }
 

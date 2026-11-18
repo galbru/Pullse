@@ -43,6 +43,15 @@ func reviewDecisionBecomesTheReviewChip(decision: String, expected: OpenPullRequ
     #expect(open.url == "https://github.com/acme/web/pull/7")
 }
 
+@Test func aPullRequestInTheMergeQueueIsMarked() throws {
+    #expect(try openPR(pr(inMergeQueue: true)).inMergeQueue)
+    #expect(try !openPR(pr()).inMergeQueue)
+    let fields = pr(author: actor("alice")).filter { $0.key != "isInMergeQueue" }
+    let mentioned = try #require(try snapshot(mentioned: [fields]).mentionedPullRequests.first)
+    #expect(mentioned.isInMergeQueue == nil)
+    #expect(!OpenPullRequest(mentioned).inMergeQueue)
+}
+
 @Test func mentionedPullRequestsStillDecodeWithoutTheStatusFields() throws {
     let fields = pr(author: actor("alice")).filter { !["isDraft", "reviewDecision", "commits"].contains($0.key) }
     let mentioned = try #require(try snapshot(mentioned: [fields]).mentionedPullRequests.first)

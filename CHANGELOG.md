@@ -13,6 +13,7 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
   based on another one's branch, its heading shows where it sits in the stack ("2/3", with
   the pull requests above and below it on hover). A stack's pull requests are listed together,
   bottom first, joined by a bracket, where the newest activity on any of them puts the stack.
+- A purple "Q" chip on an open pull request that is waiting in the merge queue.
 
 ### Changed
 - An open pull request's status chips (CI, review, draft, stack) are on their own line

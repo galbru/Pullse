@@ -146,6 +146,8 @@ public struct PullRequest: Decodable, Sendable {
     /// True when the head branch is in a fork, where its name says nothing about the
     /// base repository's branches.
     public var isCrossRepository: Bool? = nil
+    /// True while it waits in the base branch's merge queue. Only requested for my own PRs.
+    public var isInMergeQueue: Bool? = nil
 
     public var checks: [CheckContext] {
         commits?.items.last?.commit.statusCheckRollup?.contexts.items ?? []

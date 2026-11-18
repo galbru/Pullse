@@ -48,7 +48,7 @@ func pr(
     threads: [[[String: Any]]] = [], checks: [[String: Any]] = [],
     isDraft: Bool = false, reviewDecision: String? = nil, rollupState: String? = nil,
     mergeable: String? = nil, createdAt: Date = t0.addingTimeInterval(-86_400),
-    base: String = "main", head: String? = nil, fromFork: Bool = false
+    base: String = "main", head: String? = nil, fromFork: Bool = false, inMergeQueue: Bool = false
 ) -> [String: Any] {
     [
         "id": "PR_\(repo)_\(number)", "number": number, "title": "A change",
@@ -58,7 +58,7 @@ func pr(
         "repository": ["nameWithOwner": repo],
         "mergeable": mergeable ?? NSNull(),
         "baseRefName": base, "headRefName": head ?? "branch-\(number)",
-        "isCrossRepository": fromFork,
+        "isCrossRepository": fromFork, "isInMergeQueue": inMergeQueue,
         "comments": ["nodes": comments],
         // Inline comments arrive nested in the (empty "commented") review that holds them.
         "reviews": ["nodes": reviews + threads.enumerated().map { index, comments in
