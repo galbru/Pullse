@@ -206,6 +206,7 @@ final class AppModel {
                 let status = [
                     pr.ci.map { "CI \($0)" }, pr.isDraft ? "draft" : pr.review.map { "review \($0)" },
                     pr.stack.map { "stack \($0.depth)/\($0.height) (\($0.description))" },
+                    pr.inMergeQueue ? "in the merge queue" : nil,
                 ].compactMap { $0 }
                 print("  \(pr.prLabel)  \(pr.title.prefix(50))  \(status.isEmpty ? "-" : status.joined(separator: ", "))")
             }

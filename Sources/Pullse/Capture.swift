@@ -96,18 +96,18 @@ enum Capture {
     }
 
     /// The sample user's open PRs: two with activity in `sampleEvents`, two without.
-    /// api#415 is stacked on api#412.
+    /// api#415 is stacked on api#412, and web#88 is in the merge queue.
     static func sampleOpenPRs(now: Date) -> [OpenPullRequest] {
         func pr(_ repo: String, _ number: Int, _ title: String, daysAgo: Double,
                 draft: Bool = false, ci: OpenPullRequest.CIState?,
                 review: OpenPullRequest.ReviewState?,
-                base: String = "main", head: String? = nil) -> OpenPullRequest {
+                base: String = "main", head: String? = nil, queued: Bool = false) -> OpenPullRequest {
             OpenPullRequest(
                 repo: repo, number: number, title: title,
                 url: "https://github.com/\(repo)/pull/\(number)",
                 createdAt: now.addingTimeInterval(-daysAgo * 86_400),
                 isDraft: draft, ci: ci, review: review,
-                baseRef: base, headRef: head ?? "branch-\(number)"
+                baseRef: base, headRef: head ?? "branch-\(number)", inMergeQueue: queued
             )
         }
         return [
@@ -116,7 +116,7 @@ enum Capture {
             pr("acme/api", 415, "Rate limit the webhook endpoints", daysAgo: 2,
                ci: .passing, review: .required, base: "rate-limit"),
             pr("acme/web", 88, "Dark mode for the dashboard", daysAgo: 5,
-               ci: .passing, review: .approved),
+               ci: .passing, review: .approved, queued: true),
             pr("acme/cli", 57, "Add a --json flag to status", daysAgo: 0.1,
                draft: true, ci: .running, review: .required),
         ]

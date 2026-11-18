@@ -468,6 +468,7 @@ private struct GroupHeader: View {
         // The whole title first, since the heading can cut it short, then the stack. A
         // tooltip on the title or a chip alone never shows: the button's own one wins.
         .help(([group.title] + (group.open?.stack.map { ["Stacked: \($0.description)"] } ?? [])
+            + (group.open?.inMergeQueue == true ? ["In the merge queue"] : [])
             + ["Open the pull request"]).joined(separator: "\n"))
     }
 }
@@ -540,11 +541,15 @@ private struct StatusChips: View {
     let pr: OpenPullRequest
 
     static func hasAny(_ pr: OpenPullRequest) -> Bool {
-        pr.stack != nil || pr.ci != nil || pr.isDraft || pr.review != nil
+        pr.inMergeQueue || pr.stack != nil || pr.ci != nil || pr.isDraft || pr.review != nil
     }
 
     var body: some View {
         HStack(spacing: 4) {
+            // First: once queued, the PR is on its way in and the rest matters less.
+            if pr.inMergeQueue {
+                chip("Q", icon: nil, tint: .purple)
+            }
             if let stack = pr.stack {
                 chip("\(stack.depth)/\(stack.height)", icon: "square.stack.3d.up", tint: .accentColor)
             }
