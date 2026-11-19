@@ -45,15 +45,19 @@ struct MenuView: View {
                                     model.open(group)
                                 }
                                 .id(heading)
+                                .background(DeployTint.color(group.deployPhase))
                                 .modifier(StackLine(
                                     group: group, joinsAbove: group.stackedWithPrevious, joinsBelow: true, inset: 10
                                 ))
                                 if group.events.isEmpty {
-                                    Text("No new activity")
+                                    Text(group.deploys.first?.summary ?? "No new activity")
                                         .font(.caption)
                                         .foregroundStyle(.tertiary)
+                                        .lineLimit(1)
                                         .padding(.leading, 36)
                                         .padding(.vertical, 4)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(DeployTint.color(group.deployPhase))
                                         .modifier(StackLine(
                                             group: group, joinsAbove: true, joinsBelow: group.stackedWithNext, inset: 4
                                         ))
@@ -66,6 +70,7 @@ struct MenuView: View {
                                         model.open(event)
                                     }
                                     .id(row)
+                                    .background(DeployTint.color(group.deployPhase))
                                     .modifier(StackLine(
                                         group: group, joinsAbove: true,
                                         joinsBelow: event.id != group.events.last?.id || group.stackedWithNext, inset: 4
@@ -165,8 +170,8 @@ struct MenuView: View {
             Button("Mark all read") { model.markAllRead() }
                 .disabled(model.unreadCount == 0)
             Button("Clear") { model.clearHistory() }
-                .disabled(model.history.isEmpty)
-                .help("Remove everything from this list")
+                .disabled(!model.canClear)
+                .help("Remove everything from this list, except deploys still waiting to go out")
             Spacer()
             Text("v\(model.updater.version)")
                 .font(.caption)
@@ -237,7 +242,8 @@ struct MenuView: View {
     private func activityGroups() -> [ActivityGroups.Group] {
         ActivityGroups.build(
             history: model.history,
-            open: model.settings.current.showOpenPullRequests ? model.openPRs : nil
+            open: model.settings.current.showOpenPullRequests ? model.openPRs : nil,
+            deploys: model.deploys
         )
     }
 }
@@ -455,6 +461,9 @@ private struct GroupHeader: View {
                 if let pr = group.open, StatusChips.hasAny(pr) {
                     StatusChips(pr: pr)
                 }
+                if !group.deploys.isEmpty {
+                    DeployChips(deploys: group.deploys)
+                }
             }
             .foregroundStyle(.secondary)
             .padding(.horizontal, 12)
@@ -467,9 +476,17 @@ private struct GroupHeader: View {
         .onHover(perform: onHover)
         // The whole title first, since the heading can cut it short, then the stack. A
         // tooltip on the title or a chip alone never shows: the button's own one wins.
-        .help(([group.title] + (group.open?.stack.map { ["Stacked: \($0.description)"] } ?? [])
-            + (group.open?.inMergeQueue == true ? ["In the merge queue"] : [])
-            + ["Open the pull request"]).joined(separator: "\n"))
+        .help(tooltip)
+    }
+
+    private var tooltip: String {
+        var lines = [group.title]
+        if let stack = group.open?.stack { lines.append("Stacked: \(stack.description)") }
+        if group.open?.inMergeQueue == true { lines.append("In the merge queue") }
+        lines += group.deploys.map(\.summary)
+        lines.append(group.deployRun == nil ? "Open the pull request"
+            : group.deployPhase == .waiting ? "Open the workflow run to approve it" : "Open the workflow run")
+        return lines.joined(separator: "\n")
     }
 }
 
@@ -533,6 +550,50 @@ private struct StackBracket: Shape {
             path.addLine(to: CGPoint(x: x, y: rect.maxY))
         }
         return path
+    }
+}
+
+/// The background of a merged PR's rows while its deploy is followed: orange until the
+/// deploy reaches the environment, red while it waits for approval, green once approved.
+enum DeployTint {
+    static func color(_ phase: DeployWatch.Phase?) -> Color {
+        switch phase {
+        case .pending?: Color.orange.opacity(0.12)
+        case .waiting?: Color.red.opacity(0.14)
+        case .approved?: Color.green.opacity(0.12)
+        case nil: Color.clear
+        }
+    }
+}
+
+/// A merged PR's deploys, one chip per environment, under its title.
+private struct DeployChips: View {
+    let deploys: [DeployWatch]
+
+    var body: some View {
+        HStack(spacing: 4) {
+            chip("Merged", icon: "arrow.triangle.merge", tint: .purple)
+            ForEach(deploys) { deploy in
+                switch deploy.phase {
+                case .pending: chip(deploy.environment, icon: "clock", tint: .orange)
+                case .waiting: chip(deploy.environment, icon: "hand.raised.fill", tint: .red)
+                case .approved: chip(deploy.environment, icon: "checkmark", tint: .green)
+                }
+            }
+        }
+        .fixedSize()
+    }
+
+    private func chip(_ text: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 2) {
+            Image(systemName: icon).font(.caption2.weight(.bold))
+            Text(text)
+        }
+        .font(.caption2.weight(.medium))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(Capsule().fill(tint.opacity(0.12)))
     }
 }
 
@@ -643,13 +704,14 @@ private struct EventRow: View {
         case .mention: return "at"
         case .condition: return conditionRule?.symbol ?? "arrow.triangle.merge"
         case .test: return "bell.badge"
+        case .deploy: return event.isNegative ? "hand.raised.fill" : "shippingbox"
         }
     }
 
     private var tint: Color {
         if event.isNegative { return .red }
         if event.kind == .review, event.headline.hasSuffix("approved") { return .green }
-        if event.kind == .ci { return .green }
+        if event.kind == .ci || event.kind == .deploy { return .green }
         if event.kind == .condition, conditionRule?.tint == .positive { return .green }
         return .accentColor
     }

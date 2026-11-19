@@ -27,6 +27,26 @@ final class AppModel {
 
     var openPullRequests: Int { openPRs.count }
 
+    /// Merged PRs whose deploy is followed, as the menu shows them: none when it's turned
+    /// off, from another org or a muted repository, or cleared.
+    var deploys: [DeployWatch] {
+        let current = settings.current
+        guard current.trackDeploys, let org = current.organization else { return [] }
+        let detector = current.detectorSettings
+        return trackedDeploys.filter {
+            !$0.isCleared && $0.repo.lowercased().hasPrefix(org.lowercased() + "/")
+                && !detector.isMuted(nameWithOwner: $0.repo)
+        }
+    }
+
+    /// Something for "Clear" to remove.
+    var canClear: Bool { !history.isEmpty || deploys.contains { $0.phase == .approved } }
+
+    private(set) var trackedDeploys: [DeployWatch] = []
+    /// Merged PRs found with no deploy to follow, so their repository isn't read again for
+    /// them. In memory only: after a relaunch they're looked at once more.
+    @ObservationIgnored private var decidedWithoutDeploy: Set<String> = []
+
     let settings: SettingsModel
     let updater: Updater
     let shortcut = GlobalShortcut()
@@ -51,11 +71,13 @@ final class AppModel {
         updater = Updater(settings: settings, client: client)
         state = store.load()
         history = state.history
+        trackedDeploys = state.deploys
     }
 
     /// Demo GIFs only: show a finished poll without talking to GitHub.
-    func showAsPolled(openPRs: [OpenPullRequest], at date: Date) {
+    func showAsPolled(openPRs: [OpenPullRequest], deploys: [DeployWatch] = [], at date: Date) {
         polledOpenPRs = (settings.current.organization ?? "", Stacks.assign(openPRs))
+        trackedDeploys = deploys
         lastPoll = date
         lastError = nil
     }
@@ -144,10 +166,16 @@ final class AppModel {
 
         do {
             let snapshot = try await client.snapshot(org: org, mentionsSince: mentionsSince)
-            let (events, seen) = EventDetector.detect(
-                snapshot, state: state.seen, settings: settings, now: Date()
+            let previousPoll = state.seen.lastPollAt
+            let now = Date()
+            let (detected, seen) = EventDetector.detect(
+                snapshot, state: state.seen, settings: settings, now: now
             )
+            var events = detected
             state.seen = seen
+            if self.settings.current.trackDeploys {
+                events += await followDeploys(org: org, settings: settings, lastPoll: previousPoll, now: now)
+            }
             state.record(events)
             history = state.history
             // Stacks are found before muted repos and ignored drafts are hidden, so a PR
@@ -162,6 +190,32 @@ final class AppModel {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Moves the followed deploys on, and returns what to notify about. A failed fetch
+    /// leaves them as they were rather than failing the poll: deploys are extra.
+    private func followDeploys(
+        org: String, settings: DetectorSettings, lastPoll: Date?, now: Date
+    ) async -> [PREvent] {
+        // An approved deploy is done; only ones still on their way need their repository.
+        let following = Set(state.deploys.filter { $0.phase != .approved && !$0.isCleared }.map(\.repo))
+        let settled = Set(state.deploys.map(\.prURL)).union(decidedWithoutDeploy)
+        guard let snapshot = try? await client.deploys(
+            org: org, since: now.addingTimeInterval(-DeployTracker.lookback), settled: settled, following: following
+        ) else { return [] }
+        let (watches, events) = DeployTracker.update(
+            state.deploys, snapshot: snapshot, org: org, settings: settings, lastPoll: lastPoll, now: now
+        )
+        state.deploys = watches
+        trackedDeploys = watches
+        // A merge read once and not followed has nothing to wait for: its repository has no
+        // gated environment, or it was out before Pullse looked.
+        let followed = Set(watches.map(\.prURL))
+        for pr in snapshot.merged where snapshot.repositories[pr.repository.nameWithOwner] != nil
+            && !followed.contains(pr.url) {
+            decidedWithoutDeploy.insert(pr.url)
+        }
+        return events
     }
 
     /// `--check`: one live fetch, print what the last 24 hours would have notified
@@ -209,6 +263,22 @@ final class AppModel {
                     pr.inMergeQueue ? "in the merge queue" : nil,
                 ].compactMap { $0 }
                 print("  \(pr.prLabel)  \(pr.title.prefix(50))  \(status.isEmpty ? "-" : status.joined(separator: ", "))")
+            }
+            if self.settings.current.trackDeploys {
+                let snapshot = try await client.deploys(org: org, since: dayAgo, settled: [], following: [])
+                let (watches, _) = DeployTracker.update(
+                    [], snapshot: snapshot, org: org, settings: settings, lastPoll: dayAgo, now: Date()
+                )
+                let gated = snapshot.repositories.keys.sorted().map { repo in
+                    let envs = snapshot.repositories[repo]!.gatedEnvironments(
+                        override: settings.deployEnvironments(for: repo)
+                    )
+                    return "\(repo.split(separator: "/").last ?? "") \(envs.isEmpty ? "-" : envs.joined(separator: ", "))"
+                }
+                print("Deploys needing approval (\(gated.isEmpty ? "no merged PRs" : gated.joined(separator: "; "))):")
+                for watch in watches where !settings.isMuted(nameWithOwner: watch.repo) {
+                    print("  \(watch.prLabel)  \(watch.title.prefix(50))  \(watch.summary)")
+                }
             }
             print("\(events.count) events in the last 24h:")
             for event in events {
@@ -266,9 +336,15 @@ final class AppModel {
         notifier.sendTest(event)
     }
 
+    /// Clears the activity, and the deploys that are approved; the ones still on their way
+    /// stay until they're out.
     func clearHistory() {
         state.history = []
         history = []
+        for index in state.deploys.indices where state.deploys[index].phase == .approved {
+            state.deploys[index].isCleared = true
+        }
+        trackedDeploys = state.deploys
         save()
     }
 

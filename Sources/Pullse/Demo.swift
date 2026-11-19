@@ -44,7 +44,7 @@ enum Demo {
         // Shifted so the newest sample event reads "now".
         let events = Capture.sampleEvents(now: Date().addingTimeInterval(120))
         func event(_ id: String) -> PREvent { events.first { $0.id == id }! }
-        let older = events.filter { ["4", "5", "6"].contains($0.id) }
+        let older = events.filter { ["4", "5", "6", "7"].contains($0.id) }
         let ci = event("3"), review = event("1")
 
         func desktop(_ history: [PREvent], banner: PREvent? = nil, shown: CGFloat = 1,

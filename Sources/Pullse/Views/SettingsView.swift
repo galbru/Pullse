@@ -157,10 +157,11 @@ struct SettingsView: View {
 
         Section {
             Toggle("Show open pull requests in the menu", isOn: settings.binding(\.showOpenPullRequests))
+            Toggle("Follow deploys that need approval", isOn: settings.binding(\.trackDeploys))
         } header: {
             Text("Menu")
         } footer: {
-            Footnote("Lists every open pull request you authored, with its CI and review status, even when there's no new activity on it.")
+            Footnote("Lists every open pull request you authored, with its CI and review status, even when there's no new activity on it. After a merge, keeps the pull request listed while its GitHub Actions deploy goes to an environment with required reviewers: orange until it gets there, red while it waits for approval, green once approved.")
         }
 
         Section("Notify me about") {
@@ -173,6 +174,8 @@ struct SettingsView: View {
             }
             .disabled(!settings.current.notifyCI)
             Toggle("@mentions in other people's pull requests", isOn: settings.binding(\.notifyMentions))
+            Toggle("Deploys waiting for approval, and approved", isOn: settings.binding(\.notifyDeploys))
+                .disabled(!settings.current.trackDeploys)
             ForEach(PRCondition.allCases, id: \.self) { condition in
                 if let rule = PRConditions.rule(for: condition) {
                     Toggle(rule.title, isOn: settings.binding(condition))
