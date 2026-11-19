@@ -166,6 +166,8 @@ public enum ActivityGroups {
         public let open: OpenPullRequest?
         /// Newest first; empty for an open PR with no activity.
         public let events: [PREvent]
+        /// Set for a merged PR whose deploy is followed, one per environment.
+        public var deploys: [DeployWatch] = []
         /// Set when the group just before or after it is in the same stack, so the menu
         /// joins them with a line.
         public var stackedWithPrevious = false
@@ -173,22 +175,44 @@ public enum ActivityGroups {
 
         public var id: String { prURL }
 
-        /// What clicking the heading opens: the pull request, or for a group that isn't
-        /// one (the test notification) its newest event's link.
-        public var link: String? { GitHubLink.safe(prURL, fallback: events.first?.url) }
+        /// The deploy most in need of attention, which colours the group.
+        public var deployPhase: DeployWatch.Phase? { deploys.map(\.phase).min() }
+
+        /// What clicking the heading opens: for a merged PR whose deploy is followed, its
+        /// workflow run; else the pull request, or for a group that isn't one (the test
+        /// notification) its newest event's link.
+        public var link: String? {
+            if let run = deployRun { return run }
+            return GitHubLink.safe(prURL, fallback: events.first?.url)
+        }
+
+        /// The workflow run of the deploy most in need of attention (`deploys` is sorted
+        /// that way), when it has one.
+        public var deployRun: String? {
+            deploys.lazy.compactMap { GitHubLink.safe($0.link) }.first
+        }
     }
 
     /// Groups with events come first, ordered by their newest event. With `open` given
     /// (nil when the setting is off), open PRs with no events follow, newest opened first.
     /// The PRs of one stack stay together, bottom first: where its newest event puts it
-    /// when any of them has one, else where its newest opened PR would be.
-    public static func build(history: [PREvent], open: [OpenPullRequest]?) -> [Group] {
+    /// when any of them has one, else where its newest opened PR would be. Merged PRs whose
+    /// deploy is followed come between the two when they have no events, latest change
+    /// first.
+    public static func build(
+        history: [PREvent], open: [OpenPullRequest]?, deploys: [DeployWatch] = []
+    ) -> [Group] {
         let openByURL = Dictionary((open ?? []).map { ($0.url, $0) }, uniquingKeysWith: { a, _ in a })
         var order: [String] = []
         var byPR: [String: [PREvent]] = [:]
         for event in history {  // already newest first
             if byPR[event.prURL] == nil { order.append(event.prURL) }
             byPR[event.prURL, default: []].append(event)
+        }
+        let deploysByPR = Dictionary(grouping: deploys, by: \.prURL)
+        for url in deploysByPR.keys.filter({ byPR[$0] == nil })
+            .sorted(by: { latest(deploysByPR[$0]!, $0) > latest(deploysByPR[$1]!, $1) }) {
+            order.append(url)
         }
         // Every PR to list, by the stack it's in; a PR outside any stack is a stack of its
         // own here, keyed by its URL.
@@ -217,16 +241,22 @@ public enum ActivityGroups {
             for (index, url) in urls.enumerated() {
                 let events = byPR[url] ?? []
                 let pr = openByURL[url]
+                let followed = deploysByPR[url] ?? []
                 var group = Group(
-                    prURL: url, label: pr?.prLabel ?? events[0].prLabel,
-                    title: pr?.title ?? events[0].prTitle, open: pr, events: events
+                    prURL: url, label: pr?.prLabel ?? events.first?.prLabel ?? followed[0].prLabel,
+                    title: pr?.title ?? events.first?.prTitle ?? followed[0].title, open: pr, events: events
                 )
+                group.deploys = followed.sorted { ($0.phase, $0.environment) < ($1.phase, $1.environment) }
                 group.stackedWithPrevious = index > 0
                 group.stackedWithNext = index < urls.count - 1
                 groups.append(group)
             }
         }
         return groups
+    }
+
+    private static func latest(_ deploys: [DeployWatch], _ url: String) -> (Date, String) {
+        (deploys.map(\.changedAt).max() ?? .distantPast, url)
     }
 
     /// When a stack's newest PR was opened, with its URL to keep the order stable.

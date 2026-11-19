@@ -166,7 +166,10 @@ private func temporaryStore() -> StateStore {
 
 @Test func everyQueryIsReadOnly() {
     // Pullse must never change anything on GitHub: no GraphQL mutations.
-    for query in [Queries.myOpenPullRequestIDs, Queries.myPullRequests, Queries.mentions] {
+    for query in [
+        Queries.myOpenPullRequestIDs, Queries.myPullRequests, Queries.mentions,
+        Queries.myMergedPullRequests, Queries.repositoryDeployments,
+    ] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(trimmed.hasPrefix("query"))
         #expect(!query.contains("mutation"))

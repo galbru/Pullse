@@ -14,6 +14,13 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
   the pull requests above and below it on hover). A stack's pull requests are listed together,
   bottom first, joined by a bracket, where the newest activity on any of them puts the stack.
 - A purple "Q" chip on an open pull request that is waiting in the merge queue.
+- Merged pull requests whose deploy needs approval stay in the menu: orange while the
+  GitHub Actions workflow heads for an environment with required reviewers, red while the
+  deploy waits for approval, and green once it's approved or a later commit's deploy took
+  it out. Clicking one opens its workflow run, where a waiting deploy is approved. Pullse
+  notifies when a deploy starts waiting and when it's approved. Repositories
+  without such an environment are left alone; `deployEnvironments` in the settings file
+  names the environments by hand.
 
 ### Changed
 - An open pull request's status chips (CI, review, draft, stack) are on their own line

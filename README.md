@@ -22,6 +22,17 @@ grouped by PR. It also lists every open PR you authored, with its CI and review 
 even when nothing new has happened on it; turn off **Show open pull requests in the menu**
 (Settings → Notifications) to list only activity. Stacked PRs, each based on the branch
 of the one before it, show their place in the stack ("2/3") and are listed together.
+
+After a merge, a PR stays in the menu while its deploy heads for an environment that needs
+approval: orange until the workflow reaches it, red while the deploy waits for someone to
+approve it, green once approved (**Clear** removes the green ones). Clicking it opens the
+workflow run, where a waiting deploy is approved. You're notified when it
+starts waiting and when it's approved. A later commit's deploy counts for the ones before
+it, so a PR whose own deploy was never approved turns green once a newer one goes out.
+This reads GitHub's deployment records, so it works with any GitHub Actions workflow whose
+job targets an [environment with required reviewers](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment#required-reviewers);
+repositories without one are left alone. Approvals outside GitHub (Argo CD, a chat bot, a
+manually started workflow) aren't seen.
 Right-click the icon for About (the GitHub repository), Settings and Quit.
 
 Pullse works from the keyboard too. Record a shortcut in Settings → App → Keyboard to open
@@ -167,6 +178,9 @@ edits it, and changes made by hand are picked up on the next check.
   "includeBots": false,
   "mutedRepos": ["sandbox", "your-org/legacy-app"],
   "showOpenPullRequests": true,
+  "trackDeploys": true,
+  "notifyDeploys": true,
+  "deployEnvironments": { "your-org/api": ["production"], "sandbox": [] },
   "openMenuShortcut": { "keyCode": 35, "key": "P", "modifiers": ["control", "option"] },
   "checkForUpdates": true,
   "autoUpdate": false,
@@ -177,7 +191,9 @@ edits it, and changes made by hand are picked up on the next check.
 ```
 
 Every key is optional. `ciResults` is `failuresOnly` or `all`. `mutedRepos` takes a bare
-repo name or `owner/name`. If the file stops parsing, Pullse keeps its last good
+repo name or `owner/name`. `deployEnvironments` names the environments whose deploys to
+follow in a repository (bare name or `owner/name`), in place of the ones found by their
+required reviewers; an empty list turns it off there. If the file stops parsing, Pullse keeps its last good
 settings, shows the error in the menu, and doesn't write to the file until it is fixed.
 
 `bundleIdentifier` is only read by `scripts/build-app.sh`: macOS remembers notification

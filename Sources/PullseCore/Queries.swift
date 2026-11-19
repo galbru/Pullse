@@ -77,6 +77,44 @@ enum Queries {
     }
     """ + fragments
 
+    /// My most recently updated merged PRs, with the merge commit and whether its
+    /// workflow runs have finished, for following their deploys.
+    static let myMergedPullRequests = """
+    query {
+      viewer {
+        pullRequests(states: MERGED, first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) {
+          nodes {
+            id number title url mergedAt
+            repository { nameWithOwner }
+            mergeCommit {
+              oid committedDate
+              checkSuites(first: 30) { nodes { status app { slug } workflowRun { url } } }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    /// A repository's environments with their protection rules, and its newest
+    /// deployments to any of them.
+    static let repositoryDeployments = """
+    query($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        environments(first: 50) {
+          nodes { name protectionRules(first: 10) { nodes { type } } }
+        }
+        deployments(first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
+          nodes {
+            environment commitOid state createdAt
+            latestStatus { state logUrl }
+            commit { committedDate }
+          }
+        }
+      }
+    }
+    """
+
     /// Recently updated PRs by other people that mention me somewhere.
     static let mentions = """
     query($q: String!) {

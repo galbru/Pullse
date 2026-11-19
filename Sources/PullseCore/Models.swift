@@ -211,6 +211,17 @@ struct MyPullRequestsData: Decodable, Sendable {
     var pullRequests: [PullRequest] { nodes.compactMap { $0?.pullRequest } }
 }
 
+/// One page of `Queries.myMergedPullRequests`.
+struct MyMergedPullRequestsData: Decodable, Sendable {
+    struct Page: Decodable, Sendable { let nodes: [MergedPullRequest?] }
+    struct Viewer: Decodable, Sendable { let pullRequests: Page }
+    let viewer: Viewer
+}
+
+struct RepositoryDeploymentsData: Decodable, Sendable {
+    let repository: RepositoryDeployments?
+}
+
 struct MentionsData: Decodable, Sendable {
     let search: SearchResult
 }
@@ -221,6 +232,8 @@ public struct PREvent: Codable, Sendable, Identifiable, Hashable {
         case comment, review, ci, mention
         /// A state the pull request entered rather than an item someone created.
         case condition
+        /// A merged pull request's deploy waiting for approval, or approved.
+        case deploy
         /// Made by "Send test notification"; not from GitHub activity.
         case test
     }
@@ -270,6 +283,9 @@ public struct PREvent: Codable, Sendable, Identifiable, Hashable {
     /// event per key, and the notification uses it as its id so macOS replaces the
     /// earlier one too.
     public var replacementKey: String? {
+        if kind == .deploy, let phase = id.lastIndex(of: ":") {
+            return String(id[..<phase])  // one per environment and pull request
+        }
         guard kind == .condition, let condition else { return nil }
         return "\(condition.rawValue):\(prURL)"
     }

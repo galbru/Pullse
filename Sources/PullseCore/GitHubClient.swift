@@ -111,6 +111,33 @@ public actor GitHubClient {
         return (login, pullRequests)
     }
 
+    /// My PRs in `org` merged since `since`, and the deployments of the repositories of
+    /// those not in `settled` (PR URLs whose deploy is already decided) and of `following`
+    /// (deploys still on their way), for `DeployTracker`. Each repository is one request,
+    /// so ones with nothing new aren't read. A repository that can't be read is left out
+    /// rather than failing the rest.
+    public func deploys(
+        org: String, since: Date, settled: Set<String>, following: Set<String>
+    ) async throws -> DeploySnapshot {
+        let data: MyMergedPullRequestsData = try await graphQL(Queries.myMergedPullRequests, variables: [:])
+        let prefix = org.lowercased() + "/"
+        let merged = data.viewer.pullRequests.nodes.compactMap { $0 }.filter {
+            $0.repository.nameWithOwner.lowercased().hasPrefix(prefix) && ($0.mergedAt ?? .distantPast) >= since
+        }
+        var repositories: [String: RepositoryDeployments] = [:]
+        let names = Set(merged.filter { !settled.contains($0.url) }.map(\.repository.nameWithOwner))
+            .union(following)
+        for nameWithOwner in names.sorted() {
+            let parts = nameWithOwner.split(separator: "/").map(String.init)
+            guard parts.count == 2 else { continue }
+            let page: RepositoryDeploymentsData? = try? await graphQL(
+                Queries.repositoryDeployments, variables: ["owner": parts[0], "name": parts[1]]
+            )
+            if let repository = page?.repository { repositories[nameWithOwner] = repository }
+        }
+        return DeploySnapshot(merged: merged, repositories: repositories)
+    }
+
     /// Releases of `repository` ("owner/name"), newest first.
     public func releases(repository: String) async throws -> [Release] {
         guard UpdateChecker.isValidRepository(repository),
