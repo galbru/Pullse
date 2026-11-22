@@ -45,7 +45,7 @@ public struct OpenPullRequest: Sendable, Hashable {
 
     public init(_ pr: PullRequest) {
         let rollup = pr.commits?.items.last?.commit.statusCheckRollup
-        let ci: CIState? = switch rollup?.state {
+        let ci: CIState? = switch rollup?.currentState {
         case "SUCCESS": .passing
         case "FAILURE", "ERROR": .failing
         case "PENDING", "EXPECTED": .running

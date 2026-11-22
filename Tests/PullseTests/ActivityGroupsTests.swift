@@ -25,6 +25,64 @@ func rollupStateBecomesTheCIChip(state: String, expected: OpenPullRequest.CIStat
     #expect(try openPR(pr(rollupState: state)).ci == expected)
 }
 
+/// GitHub's rollup still fails on a run that a newer run of the same job replaced (one
+/// cancelled by the next push or title edit, or a failure fixed by a re-run).
+@Test(arguments: ["CANCELLED", "FAILURE"])
+func aReplacedRunDoesNotFailTheCIChip(old: String) throws {
+    let checks = [
+        checkRun("a", name: "verify-title / check", conclusion: old, workflow: "W1", run: 10),
+        checkRun("b", name: "verify-title / check", conclusion: "SUCCESS", workflow: "W1", run: 12),
+        checkRun("c", name: "test", conclusion: "SUCCESS", workflow: "W2", run: 11),
+        checkRun("d", name: "preview", conclusion: "SKIPPED", workflow: "W3", run: 13),
+    ]
+    #expect(try openPR(pr(checks: checks, rollupState: "FAILURE")).ci == .passing)
+}
+
+@Test
+func aReplacedRunWithTheNewOneStillGoingIsRunning() throws {
+    let checks = [
+        checkRun("a", name: "check", conclusion: "CANCELLED", workflow: "W1", run: 10),
+        checkRun("b", name: "check", conclusion: nil, workflow: "W1", run: 12),
+    ]
+    #expect(try openPR(pr(checks: checks, rollupState: "FAILURE")).ci == .running)
+}
+
+@Test
+func aFailureThatIsStillCurrentKeepsTheCIChipFailing() throws {
+    let replaced = [
+        checkRun("a", name: "check", conclusion: "CANCELLED", workflow: "W1", run: 10),
+        checkRun("b", name: "check", conclusion: "SUCCESS", workflow: "W1", run: 12),
+    ]
+    // Another job failed.
+    let otherJob = replaced + [checkRun("c", name: "test", conclusion: "FAILURE", workflow: "W1", run: 11)]
+    #expect(try openPR(pr(checks: otherJob, rollupState: "FAILURE")).ci == .failing)
+    // The newer run is the one that failed.
+    let newerFailed = [
+        checkRun("a", name: "check", conclusion: "SUCCESS", workflow: "W1", run: 10),
+        checkRun("b", name: "check", conclusion: "FAILURE", workflow: "W1", run: 12),
+    ]
+    #expect(try openPR(pr(checks: newerFailed, rollupState: "FAILURE")).ci == .failing)
+    // Same job name in two different workflows is two jobs.
+    let twoWorkflows = [
+        checkRun("a", name: "build", conclusion: "FAILURE", workflow: "W1", run: 10),
+        checkRun("b", name: "build", conclusion: "SUCCESS", workflow: "W2", run: 12),
+    ]
+    #expect(try openPR(pr(checks: twoWorkflows, rollupState: "FAILURE")).ci == .failing)
+    // A failing legacy status or non-Actions check can't be replaced.
+    let noWorkflow = replaced + [checkRun("c", name: "external", conclusion: "FAILURE")]
+    #expect(try openPR(pr(checks: noWorkflow, rollupState: "FAILURE")).ci == .failing)
+}
+
+@Test
+func aFullPageOfChecksKeepsTheRollup() throws {
+    let replaced = [
+        checkRun("a", name: "check", conclusion: "CANCELLED", workflow: "W1", run: 10),
+        checkRun("b", name: "check", conclusion: "SUCCESS", workflow: "W1", run: 12),
+    ]
+    let filler = (0..<98).map { checkRun("f\($0)", name: "job \($0)", conclusion: "SUCCESS") }
+    #expect(try openPR(pr(checks: replaced + filler, rollupState: "FAILURE")).ci == .failing)
+}
+
 @Test(arguments: [
     ("APPROVED", OpenPullRequest.ReviewState.approved),
     ("CHANGES_REQUESTED", .changesRequested),

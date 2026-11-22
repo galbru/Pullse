@@ -64,7 +64,10 @@ enum Queries {
                   contexts(first: 100) {
                     nodes {
                       __typename
-                      ... on CheckRun { id name status conclusion completedAt detailsUrl }
+                      ... on CheckRun {
+                        id databaseId name status conclusion completedAt detailsUrl
+                        checkSuite { workflowRun { workflow { id } } }
+                      }
                       ... on StatusContext { id context state targetUrl createdAt }
                     }
                   }

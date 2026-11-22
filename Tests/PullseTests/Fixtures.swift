@@ -33,12 +33,20 @@ func review(
 }
 
 func checkRun(
-    _ id: String, name: String, conclusion: String?, at date: Date = now
+    _ id: String, name: String, conclusion: String?, at date: Date = now,
+    workflow: String? = nil, run: Int? = nil
 ) -> [String: Any] {
-    ["__typename": "CheckRun", "id": id, "name": name,
-     "status": conclusion == nil ? "IN_PROGRESS" : "COMPLETED",
-     "conclusion": conclusion ?? NSNull(), "completedAt": stamp(date),
-     "detailsUrl": "https://github.com/checks/\(id)"]
+    var node: [String: Any] = [
+        "__typename": "CheckRun", "id": id, "name": name,
+        "status": conclusion == nil ? "IN_PROGRESS" : "COMPLETED",
+        "conclusion": conclusion ?? NSNull(), "completedAt": stamp(date),
+        "detailsUrl": "https://github.com/checks/\(id)",
+    ]
+    if let workflow {
+        node["checkSuite"] = ["workflowRun": ["workflow": ["id": workflow]]]
+    }
+    if let run { node["databaseId"] = run }
+    return node
 }
 
 func pr(
