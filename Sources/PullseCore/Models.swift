@@ -63,6 +63,10 @@ public struct CheckContext: Decodable, Sendable {
     public let conclusion: String?
     public let completedAt: Date?
     public let detailsUrl: String?
+    /// Grows with every check run GitHub creates, so the larger of two is the newer.
+    public var databaseId: Int? = nil
+    /// The workflow it belongs to, for an Actions check run. Not requested in every query.
+    public var checkSuite: CheckSuiteRef? = nil
     // StatusContext
     public let context: String?
     public let state: String?
@@ -71,7 +75,7 @@ public struct CheckContext: Decodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case typename = "__typename"
-        case id, name, status, conclusion, completedAt, detailsUrl
+        case id, name, status, conclusion, completedAt, detailsUrl, databaseId, checkSuite
         case context, state, targetUrl, createdAt
     }
 
@@ -90,10 +94,26 @@ public struct CheckContext: Decodable, Sendable {
     }
 
     public var finishedAt: Date? { completedAt ?? createdAt }
+
+    /// The same job of the same workflow: a newer run with this key replaces an older one,
+    /// as when a re-run, or a new run that cancels the one in progress, starts. Nil for
+    /// anything but an Actions check run.
+    var rerunKey: String? {
+        guard let workflow = checkSuite?.workflowRun?.workflow?.id, let name else { return nil }
+        return workflow + "\n" + name
+    }
     /// The check's own page, only when it is on GitHub: `detailsUrl` and `targetUrl` are
     /// set by whoever reports the check (see `GitHubLink`). Nil makes the event link to
     /// the PR's checks page instead.
     public var link: String? { GitHubLink.safe(detailsUrl ?? targetUrl) }
+}
+
+public struct CheckSuiteRef: Decodable, Sendable {
+    public struct WorkflowRun: Decodable, Sendable {
+        public struct Workflow: Decodable, Sendable { public let id: String }
+        public let workflow: Workflow?
+    }
+    public let workflowRun: WorkflowRun?
 }
 
 public struct StatusCheckRollup: Decodable, Sendable {
@@ -101,6 +121,33 @@ public struct StatusCheckRollup: Decodable, Sendable {
     /// Only requested for my own PRs.
     public var state: String? = nil
     public let contexts: Connection<CheckContext>
+
+    /// How many contexts the query asks for; with this many, some may be missing.
+    static let contextsLimit = 100
+
+    /// `state`, except that a failure only from check runs a newer run of the same
+    /// workflow job has replaced doesn't count. GitHub's rollup still counts those (a run
+    /// cancelled by a newer one, or a failed run that a re-run fixed) while the pull
+    /// request page shows only the newest, so the menu said failing when the page said
+    /// passed. When every context isn't at hand, the rollup stands.
+    public var currentState: String? {
+        guard state == "FAILURE" || state == "ERROR" else { return state }
+        let checks = contexts.items
+        guard checks.count < Self.contextsLimit else { return state }
+        var newest: [String: CheckContext] = [:]
+        for check in checks {
+            guard let key = check.rerunKey else { continue }
+            if let other = newest[key], (other.databaseId ?? 0) >= (check.databaseId ?? 0) { continue }
+            newest[key] = check
+        }
+        let current = checks.filter { check in
+            check.rerunKey.map { newest[$0]?.id == check.id } ?? true
+        }
+        guard current.count < checks.count else { return state }
+        let fine: Set<String> = ["SUCCESS", "SKIPPED", "NEUTRAL"]
+        if current.contains(where: { $0.outcome.map { !fine.contains($0) } ?? false }) { return state }
+        return current.contains { $0.outcome == nil } ? "PENDING" : "SUCCESS"
+    }
 }
 
 public struct Commit: Decodable, Sendable {

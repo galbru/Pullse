@@ -8,6 +8,12 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Fixed
+- A pull request whose checks passed no longer shows failing CI in the menu because of an
+  older run that a newer run of the same job replaced (cancelled by the next push, or
+  fixed by a re-run). GitHub's combined status still counts that run; the pull request
+  page doesn't.
+
 ## [0.14.0] - 2026-11-10
 
 ### Changed
