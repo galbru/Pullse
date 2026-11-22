@@ -83,7 +83,15 @@ public struct RepositoryDeployments: Decodable, Sendable {
         /// Approved and on its way out.
         var approved: Bool { ["QUEUED", "IN_PROGRESS"].contains(status) }
         var waiting: Bool { status == "WAITING" }
-        var link: String? { GitHubLink.safe(latestStatus?.logUrl) }
+        /// The workflow run, not the job: an Actions deployment's log URL points at the one
+        /// job (…/actions/runs/<run>/job/<job>), and the run page is where Review deployments is.
+        var link: String? {
+            guard let url = GitHubLink.safe(latestStatus?.logUrl) else { return nil }
+            guard let range = url.range(of: #"/actions/runs/\d+/job/\d+"#, options: .regularExpression),
+                  let job = url.range(of: "/job/", range: range)
+            else { return url }
+            return String(url[..<job.lowerBound])
+        }
     }
 
     /// Nil when the token can't read them.

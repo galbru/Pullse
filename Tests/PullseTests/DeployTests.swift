@@ -32,7 +32,7 @@ private func deployment(
 ) -> [String: Any] {
     [
         "environment": environment, "commitOid": commit, "state": status == "SUCCESS" ? "ACTIVE" : status,
-        "createdAt": stamp(committed), "latestStatus": ["state": status, "logUrl": "https://github.com/\(api)/actions/runs/1"],
+        "createdAt": stamp(committed), "latestStatus": ["state": status, "logUrl": "https://github.com/\(api)/actions/runs/1/job/7"],
         "commit": ["committedDate": stamp(committed)],
     ]
 }
