@@ -7,10 +7,21 @@ public struct PersistedState: Codable, Sendable {
     public var history: [PREvent] = []
     /// The app version that last ran, to say "updated to x.y.z" once after an update.
     public var lastRunVersion: String?
+    /// Merged pull requests whose deploy waits, or waited, for approval.
+    public var deploys: [DeployWatch] = []
 
     public static let historyLimit = 100
 
     public init() {}
+
+    /// A state file from before a key existed still decodes, rather than starting over.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        seen = try c.decodeIfPresent(SeenState.self, forKey: .seen) ?? SeenState()
+        history = try c.decodeIfPresent([PREvent].self, forKey: .history) ?? []
+        lastRunVersion = try c.decodeIfPresent(String.self, forKey: .lastRunVersion)
+        deploys = try c.decodeIfPresent([DeployWatch].self, forKey: .deploys) ?? []
+    }
 
     public mutating func record(_ events: [PREvent]) {
         let known = Set(history.map(\.id))

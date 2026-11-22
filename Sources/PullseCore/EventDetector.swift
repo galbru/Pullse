@@ -15,8 +15,18 @@ public struct DetectorSettings: Sendable {
     public var mutedRepos: Set<String> = []
     public var ignoreDrafts = false
     public var enabledConditions: Set<PRCondition> = Set(PRCondition.allCases)
+    /// Notify when a merged pull request's deploy waits for approval, and when it's approved.
+    public var deploys = true
+    /// The environments to follow deploys to, by repository (`owner/name` or bare `name`,
+    /// lowercased), in place of the ones that require reviewers. Empty turns it off there.
+    public var deployEnvironments: [String: [String]] = [:]
 
     public init() {}
+
+    public func deployEnvironments(for nameWithOwner: String) -> [String]? {
+        let name = nameWithOwner.split(separator: "/").last.map(String.init) ?? nameWithOwner
+        return deployEnvironments[nameWithOwner.lowercased()] ?? deployEnvironments[name.lowercased()]
+    }
 
     /// "docs, Acme/API web" → ["docs", "acme/api", "web"]: separated by
     /// commas and/or whitespace, lowercased for matching.

@@ -8,6 +8,26 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Added
+- Stacked pull requests are marked in the menu. When one of your open pull requests is
+  based on another one's branch, its heading shows where it sits in the stack ("2/3", with
+  the pull requests above and below it on hover). A stack's pull requests are listed together,
+  bottom first, joined by a bracket, where the newest activity on any of them puts the stack.
+- A purple "Q" chip on an open pull request that is waiting in the merge queue.
+- Merged pull requests whose deploy needs approval stay in the menu: orange while the
+  GitHub Actions workflow heads for an environment with required reviewers, red while the
+  deploy waits for approval, and green once it's approved or a later commit's deploy took
+  it out. Clicking one opens its workflow run, where a waiting deploy is approved. Pullse
+  notifies when a deploy starts waiting and when it's approved. Repositories
+  without such an environment are left alone; `deployEnvironments` in the settings file
+  names the environments by hand.
+
+### Changed
+- An open pull request's status chips (CI, review, draft, stack) are on their own line
+  under its title in the menu, so the title is no longer cut short to make room for them.
+- Checks that are still running show a clock on the CI chip instead of "…".
+- Hovering over a pull request's heading in the menu shows its whole title.
+
 ### Fixed
 - A pull request whose checks passed no longer shows failing CI in the menu because of an
   older run that a newer run of the same job replaced (cancelled by the next push, or

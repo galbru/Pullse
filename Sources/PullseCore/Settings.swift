@@ -19,6 +19,16 @@ public struct PullseSettings: Codable, Equatable, Sendable {
     /// List every open PR of mine in the menu, with its CI and review status, even when
     /// it has no new activity.
     public var showOpenPullRequests = true
+    /// Keep a merged pull request of mine in the menu while its deploy to an environment
+    /// that needs approval is on its way: orange until the deploy reaches it, red while it
+    /// waits for approval, green once approved.
+    public var trackDeploys = true
+    /// Notify when such a deploy starts waiting for approval and when it's approved.
+    public var notifyDeploys = true
+    /// File only. The environments to follow by repository, `owner/name` or bare `name`, in
+    /// place of the ones found by their required reviewers: `{"api": ["production"]}`.
+    /// An empty list turns it off for that repository.
+    public var deployEnvironments: [String: [String]] = [:]
     /// Opens and closes the menu from any app. None until the user records one.
     public var openMenuShortcut: HotKey?
     /// Pull request states to notify about, keyed by `PRCondition` raw value. A key
@@ -56,6 +66,9 @@ public struct PullseSettings: Codable, Equatable, Sendable {
         mutedRepos = try c.decodeIfPresent([String].self, forKey: .mutedRepos) ?? d.mutedRepos
         ignoreDrafts = try c.decodeIfPresent(Bool.self, forKey: .ignoreDrafts) ?? d.ignoreDrafts
         showOpenPullRequests = try c.decodeIfPresent(Bool.self, forKey: .showOpenPullRequests) ?? d.showOpenPullRequests
+        trackDeploys = try c.decodeIfPresent(Bool.self, forKey: .trackDeploys) ?? d.trackDeploys
+        notifyDeploys = try c.decodeIfPresent(Bool.self, forKey: .notifyDeploys) ?? d.notifyDeploys
+        deployEnvironments = try c.decodeIfPresent([String: [String]].self, forKey: .deployEnvironments) ?? d.deployEnvironments
         // A hand-edited shortcut that doesn't decode is treated as none, not as a broken file.
         openMenuShortcut = (try? c.decodeIfPresent(HotKey.self, forKey: .openMenuShortcut)) ?? nil
         conditions = try c.decodeIfPresent([String: Bool].self, forKey: .conditions) ?? d.conditions
@@ -95,6 +108,10 @@ public struct PullseSettings: Codable, Equatable, Sendable {
         s.mutedRepos = DetectorSettings.parseRepoList(mutedRepos.joined(separator: ","))
         s.ignoreDrafts = ignoreDrafts
         s.enabledConditions = Set(PRCondition.allCases.filter(isEnabled))
+        s.deploys = notifyDeploys
+        s.deployEnvironments = Dictionary(
+            deployEnvironments.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { a, _ in a }
+        )
         return s
     }
 }

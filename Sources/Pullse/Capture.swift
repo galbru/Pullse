@@ -79,7 +79,10 @@ enum Capture {
             file: settingsFile, displayPath: "~/.config/pullse/settings.json"
         ))
         model.updater.showAsRelease()
-        model.showAsPolled(openPRs: sampleOpenPRs(now: Date()), at: Date().addingTimeInterval(-20))
+        model.showAsPolled(
+            openPRs: sampleOpenPRs(now: Date()), deploys: sampleDeploys(now: Date()),
+            at: Date().addingTimeInterval(-20)
+        )
         let asset = { (id: Int, name: String) in
             ReleaseAsset(id: id, name: name, url: "https://api.github.com/assets/\(id)", size: 0)
         }
@@ -95,25 +98,48 @@ enum Capture {
         return model
     }
 
-    /// The sample user's open PRs: two with activity in `sampleEvents`, one without.
+    /// The sample user's open PRs: two with activity in `sampleEvents`, two without.
+    /// api#415 is stacked on api#412, and web#88 is in the merge queue.
     static func sampleOpenPRs(now: Date) -> [OpenPullRequest] {
         func pr(_ repo: String, _ number: Int, _ title: String, daysAgo: Double,
                 draft: Bool = false, ci: OpenPullRequest.CIState?,
-                review: OpenPullRequest.ReviewState?) -> OpenPullRequest {
+                review: OpenPullRequest.ReviewState?,
+                base: String = "main", head: String? = nil, queued: Bool = false) -> OpenPullRequest {
             OpenPullRequest(
                 repo: repo, number: number, title: title,
                 url: "https://github.com/\(repo)/pull/\(number)",
                 createdAt: now.addingTimeInterval(-daysAgo * 86_400),
-                isDraft: draft, ci: ci, review: review
+                isDraft: draft, ci: ci, review: review,
+                baseRef: base, headRef: head ?? "branch-\(number)", inMergeQueue: queued
             )
         }
         return [
             pr("acme/api", 412, "Add rate limiting to the public API", daysAgo: 3,
-               ci: .failing, review: .changesRequested),
+               ci: .failing, review: .changesRequested, head: "rate-limit"),
+            pr("acme/api", 415, "Rate limit the webhook endpoints", daysAgo: 2,
+               ci: .passing, review: .required, base: "rate-limit"),
             pr("acme/web", 88, "Dark mode for the dashboard", daysAgo: 5,
-               ci: .passing, review: .approved),
+               ci: .passing, review: .approved, queued: true),
             pr("acme/cli", 57, "Add a --json flag to status", daysAgo: 0.1,
                draft: true, ci: .running, review: .required),
+        ]
+    }
+
+    /// The sample user's merged PRs on their way to production: api#409 waits for
+    /// approval, and web#85 went out with a later deploy.
+    static func sampleDeploys(now: Date) -> [DeployWatch] {
+        func deploy(_ repo: String, _ number: Int, _ title: String, _ phase: DeployWatch.Phase,
+                    minutesAgo: Double, coveredBy: String? = nil) -> DeployWatch {
+            let date = now.addingTimeInterval(-minutesAgo * 60)
+            return DeployWatch(
+                repo: repo, number: number, title: title, prURL: "https://github.com/\(repo)/pull/\(number)",
+                environment: "production", commit: "c\(number)", commitDate: date, mergedAt: date,
+                phase: phase, changedAt: date, coveredBy: coveredBy
+            )
+        }
+        return [
+            deploy("acme/api", 409, "Cache API token lookups", .waiting, minutesAgo: 25),
+            deploy("acme/web", 85, "Fix the chart tooltips", .approved, minutesAgo: 240, coveredBy: "4f1c2ab"),
         ]
     }
 
@@ -122,6 +148,7 @@ enum Capture {
         let api = ("acme/api", 412, "Add rate limiting to the public API")
         let web = ("acme/web", 88, "Dark mode for the dashboard")
         let docs = ("acme/docs", 31, "Document the webhook retry policy")
+        let merged = ("acme/api", 409, "Cache API token lookups")
 
         func event(
             _ id: String, _ kind: PREvent.Kind, _ pr: (String, Int, String), _ author: String?,
@@ -144,6 +171,8 @@ enum Capture {
                   "Can we make the burst size configurable per plan?", ago(9)),
             event("3", .ci, api, nil, "CI failed: lint, unit-tests +1",
                   "lint, unit-tests, integration", ago(14), negative: true),
+            event("7", .deploy, merged, nil, "Waiting for approval: production",
+                  "Someone who can approve deploys to production has to review it.", ago(25), negative: true),
             event("4", .review, web, "carol", "carol approved",
                   "Looks great in both themes. Ship it!", ago(48), unread: false),
             event("5", .mention, docs, "dave", "dave mentioned you",

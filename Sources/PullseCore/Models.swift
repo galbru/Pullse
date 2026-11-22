@@ -186,6 +186,15 @@ public struct PullRequest: Decodable, Sendable {
     public var reviewDecision: String? = nil
     /// MERGEABLE, CONFLICTING, or UNKNOWN while GitHub is still working it out.
     public var mergeable: String? = nil
+    /// The branch it merges into and the branch it brings, for finding stacks: a PR whose
+    /// base is another of my PRs' head sits on top of it. Only requested for my own PRs.
+    public var baseRefName: String? = nil
+    public var headRefName: String? = nil
+    /// True when the head branch is in a fork, where its name says nothing about the
+    /// base repository's branches.
+    public var isCrossRepository: Bool? = nil
+    /// True while it waits in the base branch's merge queue. Only requested for my own PRs.
+    public var isInMergeQueue: Bool? = nil
 
     public var checks: [CheckContext] {
         commits?.items.last?.commit.statusCheckRollup?.contexts.items ?? []
@@ -249,6 +258,17 @@ struct MyPullRequestsData: Decodable, Sendable {
     var pullRequests: [PullRequest] { nodes.compactMap { $0?.pullRequest } }
 }
 
+/// One page of `Queries.myMergedPullRequests`.
+struct MyMergedPullRequestsData: Decodable, Sendable {
+    struct Page: Decodable, Sendable { let nodes: [MergedPullRequest?] }
+    struct Viewer: Decodable, Sendable { let pullRequests: Page }
+    let viewer: Viewer
+}
+
+struct RepositoryDeploymentsData: Decodable, Sendable {
+    let repository: RepositoryDeployments?
+}
+
 struct MentionsData: Decodable, Sendable {
     let search: SearchResult
 }
@@ -259,6 +279,8 @@ public struct PREvent: Codable, Sendable, Identifiable, Hashable {
         case comment, review, ci, mention
         /// A state the pull request entered rather than an item someone created.
         case condition
+        /// A merged pull request's deploy waiting for approval, or approved.
+        case deploy
         /// Made by "Send test notification"; not from GitHub activity.
         case test
     }
@@ -308,6 +330,9 @@ public struct PREvent: Codable, Sendable, Identifiable, Hashable {
     /// event per key, and the notification uses it as its id so macOS replaces the
     /// earlier one too.
     public var replacementKey: String? {
+        if kind == .deploy, let phase = id.lastIndex(of: ":") {
+            return String(id[..<phase])  // one per environment and pull request
+        }
         guard kind == .condition, let condition else { return nil }
         return "\(condition.rawValue):\(prURL)"
     }
