@@ -26,6 +26,14 @@ private actor Requests {
     func add(_ ids: [String]) { details.append(ids) }
 }
 
+/// Counts the detail requests running at the same time.
+private actor InFlight {
+    private(set) var current = 0
+    private(set) var most = 0
+    func start() { current += 1; most = max(most, current) }
+    func end() { current -= 1 }
+}
+
 /// Id pages keyed by the cursor that requests them ("" for the first). The details for
 /// an id are the fixture PR of that number, and an id in `deleted` comes back null.
 private func fetchAll(
@@ -67,13 +75,33 @@ private func fetchAll(
         #expect(await requests.details == [["PR_acme/api_1", "PR_Acme/api_3"]])
     }
 
-    @Test func detailsAreFetchedAPageAtATimeInOrder() async throws {
+    @Test func detailsAreFetchedAPageAtATime() async throws {
         let requests = Requests()
         let numbers = try await fetchAll([
             "": try idPage((1...5).map { ("acme", $0) }, next: nil),
         ], pageSize: 2, requests: requests)
         #expect(numbers == [1, 2, 3, 4, 5])
-        #expect(await requests.details.map(\.count) == [2, 2, 1])
+        #expect(await requests.details.sorted { $0[0] < $1[0] }
+            == [["PR_acme/api_1", "PR_acme/api_2"], ["PR_acme/api_3", "PR_acme/api_4"], ["PR_acme/api_5"]])
+    }
+
+    @Test func detailPagesAreFetchedAtOnceAndKeptInOrder() async throws {
+        let inFlight = InFlight()
+        let numbers = try await GitHubClient.myPullRequests(
+            org: "acme", limit: 100, pageSize: 2,
+            ids: { _ in try idPage((1...5).map { ("acme", $0) }, next: nil) },
+            details: { ids in
+                await inFlight.start()
+                // The first page finishes last, so the result order can't come from the
+                // order the requests finish in.
+                try await Task.sleep(for: .milliseconds(ids.first == "PR_acme/api_1" ? 100 : 20))
+                await inFlight.end()
+                let nodes = ids.map { pr(repo: "acme/api", number: Int($0.split(separator: "_").last!)!) }
+                return try GitHubClient.decode(try JSONSerialization.data(withJSONObject: ["data": ["nodes": nodes]]))
+            }
+        ).pullRequests.map(\.number)
+        #expect(numbers == [1, 2, 3, 4, 5])
+        #expect(await inFlight.most > 1)
     }
 
     @Test func aPullRequestListedOnTwoPagesIsKeptOnce() async throws {

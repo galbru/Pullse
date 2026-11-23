@@ -48,6 +48,7 @@ public actor GitHubClient {
 
     /// Fetch everything one poll needs. `mentionsSince` nil skips the mentions query.
     public func snapshot(org: String, mentionsSince: Date?) async throws -> Snapshot {
+        async let mentioned = mentions(org: org, since: mentionsSince)
         let mine = try await Self.myPullRequests(
             org: org, limit: Queries.myPullRequestsLimit, pageSize: Queries.myPullRequestsPageSize,
             ids: { after in
@@ -63,28 +64,30 @@ public actor GitHubClient {
                 return page
             }
         )
-        var mentioned: [PullRequest] = []
-        if let since = mentionsSince {
-            let data: MentionsData = try await graphQL(
-                Queries.mentions, variables: ["q": Queries.mentionsSearch(org: org, since: since)]
-            )
-            mentioned = data.search.pullRequests
-        }
         return Snapshot(
             login: mine.login,
             myPullRequests: mine.pullRequests,
-            mentionedPullRequests: mentioned
+            mentionedPullRequests: try await mentioned
         )
+    }
+
+    private func mentions(org: String, since: Date?) async throws -> [PullRequest] {
+        guard let since else { return [] }
+        let data: MentionsData = try await graphQL(
+            Queries.mentions, variables: ["q": Queries.mentionsSearch(org: org, since: since)]
+        )
+        return data.search.pullRequests
     }
 
     /// Lists the ids of my open PRs through `ids` (given the cursor to start after, nil
     /// for the first page), keeps the first `limit` in `org`, then fetches them in full
-    /// through `details`, `pageSize` at a time. A PR listed on two pages (one opened
-    /// between the requests pushes the rest down) is kept once.
+    /// through `details`, `pageSize` at a time, all pages at once and kept in listing
+    /// order. A PR listed on two pages (one opened between the requests pushes the rest
+    /// down) is kept once.
     static func myPullRequests(
         org: String, limit: Int, pageSize: Int,
         ids: @Sendable (String?) async throws -> MyOpenPullRequestIDsData,
-        details: @Sendable ([String]) async throws -> MyPullRequestsData
+        details: @escaping @Sendable ([String]) async throws -> MyPullRequestsData
     ) async throws -> (login: String, pullRequests: [PullRequest]) {
         var login = ""
         var wanted: [String] = []
@@ -103,19 +106,30 @@ public actor GitHubClient {
         } while wanted.count < limit
         wanted = Array(wanted.prefix(limit))
 
-        var pullRequests: [PullRequest] = []
-        for start in stride(from: 0, to: wanted.count, by: pageSize) {
-            let chunk = Array(wanted[start..<min(start + pageSize, wanted.count)])
-            pullRequests += try await details(chunk).pullRequests
+        // Each page takes about 5 seconds, so fetching them one after another makes a poll
+        // for 65 open PRs take 25 seconds. At most `limit / pageSize` (7) requests run at
+        // once, well under GitHub's limit of 100 concurrent requests per user.
+        let chunks = stride(from: 0, to: wanted.count, by: pageSize).map {
+            Array(wanted[$0..<min($0 + pageSize, wanted.count)])
         }
-        return (login, pullRequests)
+        let pages = try await withThrowingTaskGroup(of: (Int, [PullRequest]).self) { group in
+            for (index, chunk) in chunks.enumerated() {
+                group.addTask { (index, try await details(chunk).pullRequests) }
+            }
+            var pages = [[PullRequest]](repeating: [], count: chunks.count)
+            for try await (index, pullRequests) in group {
+                pages[index] = pullRequests
+            }
+            return pages
+        }
+        return (login, pages.flatMap { $0 })
     }
 
     /// My PRs in `org` merged since `since`, and the deployments of the repositories of
     /// those not in `settled` (PR URLs whose deploy is already decided) and of `following`
     /// (deploys still on their way), for `DeployTracker`. Each repository is one request,
-    /// so ones with nothing new aren't read. A repository that can't be read is left out
-    /// rather than failing the rest.
+    /// so ones with nothing new aren't read, and the requests are sent at once. A
+    /// repository that can't be read is left out rather than failing the rest.
     public func deploys(
         org: String, since: Date, settled: Set<String>, following: Set<String>
     ) async throws -> DeploySnapshot {
@@ -124,16 +138,24 @@ public actor GitHubClient {
         let merged = data.viewer.pullRequests.nodes.compactMap { $0 }.filter {
             $0.repository.nameWithOwner.lowercased().hasPrefix(prefix) && ($0.mergedAt ?? .distantPast) >= since
         }
-        var repositories: [String: RepositoryDeployments] = [:]
         let names = Set(merged.filter { !settled.contains($0.url) }.map(\.repository.nameWithOwner))
             .union(following)
-        for nameWithOwner in names.sorted() {
-            let parts = nameWithOwner.split(separator: "/").map(String.init)
-            guard parts.count == 2 else { continue }
-            let page: RepositoryDeploymentsData? = try? await graphQL(
-                Queries.repositoryDeployments, variables: ["owner": parts[0], "name": parts[1]]
-            )
-            if let repository = page?.repository { repositories[nameWithOwner] = repository }
+        let repositories = await withTaskGroup(of: (String, RepositoryDeployments?).self) { group in
+            for nameWithOwner in names {
+                let parts = nameWithOwner.split(separator: "/").map(String.init)
+                guard parts.count == 2 else { continue }
+                group.addTask {
+                    let page: RepositoryDeploymentsData? = try? await self.graphQL(
+                        Queries.repositoryDeployments, variables: ["owner": parts[0], "name": parts[1]]
+                    )
+                    return (nameWithOwner, page?.repository)
+                }
+            }
+            var repositories: [String: RepositoryDeployments] = [:]
+            for await (nameWithOwner, repository) in group {
+                if let repository { repositories[nameWithOwner] = repository }
+            }
+            return repositories
         }
         return DeploySnapshot(merged: merged, repositories: repositories)
     }

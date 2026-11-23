@@ -60,10 +60,10 @@ Two targets. `PullseCore` has no AppKit or SwiftUI and holds all the logic under
    modification date changes. It stops the poll if there's no org or the file won't parse.
 2. `GitHubClient.snapshot` makes GraphQL requests using the token from `gh auth
    token`: the ids of the user's open PRs from `viewer.pullRequests` (every org, kept
-   to the configured one, up to 100), those PRs in full through `nodes(ids:)` 15 at a
-   time, then one search for mentions. The open PRs are not searched: the search index
-   sometimes drops whole repositories from a response with no error, so PRs vanished
-   from the menu between polls. GitHub gives a query about 10 seconds and each PR with
+   to the configured one, up to 100), then those PRs in full through `nodes(ids:)` 15 at a
+   time, all pages at once, and alongside them one search for mentions. The open PRs are
+   not searched: the search index sometimes drops whole repositories from a response with
+   no error, so PRs vanished from the menu between polls. GitHub gives a query about 10 seconds and each PR with
    its conversation and checks costs a fraction of one, so a single request for 40+ PRs
    timed out with HTTP 504. The client looks for `gh` in Homebrew paths first, because GUI apps don't get
    the shell's PATH. On a 401 it drops the cached token and retries once. Query text is in
@@ -81,10 +81,11 @@ Two targets. `PullseCore` has no AppKit or SwiftUI and holds all the logic under
    base branch is another open PR's head in the same repo, forks excluded) before any are
    hidden, and `build` keeps a stack's PRs together, bottom first, placed by its newest
    event (or, with none, its newest opened PR).
-6. With `trackDeploys` on, `AppModel.followDeploys` asks `GitHubClient.deploys` for my PRs
-   merged in the last day and, for each repository with something unsettled, its
-   environments and newest deployments (one request per repository; a failure leaves the
-   followed deploys as they were). `DeployTracker.update` (pure, like `EventDetector`)
+6. With `trackDeploys` on, `AppModel.fetchDeploys`, running alongside step 2, asks
+   `GitHubClient.deploys` for my PRs merged in the last day and, for each repository with
+   something unsettled, its environments and newest deployments (one request per
+   repository, all at once; a failure leaves the followed deploys as they were), and
+   `AppModel.followDeploys` applies the result. `DeployTracker.update` (pure, like `EventDetector`)
    follows each merge into every gated environment (required reviewers, or
    `deployEnvironments`) as a `DeployWatch`: pending (orange) until a Deployment exists,
    waiting (red) while it's WAITING, approved (green) once approved or once a later commit

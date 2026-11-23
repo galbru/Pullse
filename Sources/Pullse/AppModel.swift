@@ -165,6 +165,7 @@ final class AppModel {
             : nil
 
         do {
+            async let deploySnapshot = fetchDeploys(org: org)
             let snapshot = try await client.snapshot(org: org, mentionsSince: mentionsSince)
             let previousPoll = state.seen.lastPollAt
             let now = Date()
@@ -173,8 +174,8 @@ final class AppModel {
             )
             var events = detected
             state.seen = seen
-            if self.settings.current.trackDeploys {
-                events += await followDeploys(org: org, settings: settings, lastPoll: previousPoll, now: now)
+            if let deploySnapshot = await deploySnapshot {
+                events += followDeploys(deploySnapshot, org: org, settings: settings, lastPoll: previousPoll, now: now)
             }
             state.record(events)
             history = state.history
@@ -192,17 +193,23 @@ final class AppModel {
         }
     }
 
-    /// Moves the followed deploys on, and returns what to notify about. A failed fetch
-    /// leaves them as they were rather than failing the poll: deploys are extra.
-    private func followDeploys(
-        org: String, settings: DetectorSettings, lastPoll: Date?, now: Date
-    ) async -> [PREvent] {
+    /// The deploys to follow, read while the open PRs are. Nil when deploys aren't tracked
+    /// or the fetch failed, which leaves the followed deploys as they were rather than
+    /// failing the poll: deploys are extra.
+    private func fetchDeploys(org: String) async -> DeploySnapshot? {
+        guard settings.current.trackDeploys else { return nil }
         // An approved deploy is done; only ones still on their way need their repository.
         let following = Set(state.deploys.filter { $0.phase != .approved && !$0.isCleared }.map(\.repo))
         let settled = Set(state.deploys.map(\.prURL)).union(decidedWithoutDeploy)
-        guard let snapshot = try? await client.deploys(
-            org: org, since: now.addingTimeInterval(-DeployTracker.lookback), settled: settled, following: following
-        ) else { return [] }
+        return try? await client.deploys(
+            org: org, since: Date().addingTimeInterval(-DeployTracker.lookback), settled: settled, following: following
+        )
+    }
+
+    /// Moves the followed deploys on, and returns what to notify about.
+    private func followDeploys(
+        _ snapshot: DeploySnapshot, org: String, settings: DetectorSettings, lastPoll: Date?, now: Date
+    ) -> [PREvent] {
         let (watches, events) = DeployTracker.update(
             state.deploys, snapshot: snapshot, org: org, settings: settings, lastPoll: lastPoll, now: now
         )
@@ -232,6 +239,8 @@ final class AppModel {
         do {
             let settings = settings.current.detectorSettings
             let dayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+            async let deploySnapshot = self.settings.current.trackDeploys
+                ? client.deploys(org: org, since: dayAgo, settled: [], following: []) : nil
             let snapshot = try await client.snapshot(
                 org: org, mentionsSince: settings.mentions ? dayAgo : nil
             )
@@ -264,8 +273,7 @@ final class AppModel {
                 ].compactMap { $0 }
                 print("  \(pr.prLabel)  \(pr.title.prefix(50))  \(status.isEmpty ? "-" : status.joined(separator: ", "))")
             }
-            if self.settings.current.trackDeploys {
-                let snapshot = try await client.deploys(org: org, since: dayAgo, settled: [], following: [])
+            if let snapshot = try await deploySnapshot {
                 let (watches, _) = DeployTracker.update(
                     [], snapshot: snapshot, org: org, settings: settings, lastPoll: dayAgo, now: Date()
                 )
