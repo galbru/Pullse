@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-23
+
 ### Changed
 - Checking GitHub is about three times faster for someone with many open pull requests.
   Pullse now sends its requests for pull request details, mentions and deploys at the same
