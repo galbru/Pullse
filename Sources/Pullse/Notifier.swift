@@ -28,7 +28,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate, @unchecked Sen
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
-    func post(_ events: [PREvent]) {
+    func post(_ events: [PREvent], sound: Bool) {
         if events.count > Self.burstLimit {
             let lines = events.prefix(4).map { "\($0.prLabel): \($0.headline)" }
             let more = events.count > 4 ? "\n+\(events.count - 4) more" : ""
@@ -38,7 +38,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate, @unchecked Sen
                 subtitle: nil,
                 body: lines.joined(separator: "\n") + more,
                 url: "https://github.com/pulls",
-                thread: "summary"
+                thread: "summary",
+                sound: sound
             )
             return
         }
@@ -49,30 +50,33 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate, @unchecked Sen
                 subtitle: event.prTitle,
                 body: event.snippet,
                 url: event.url,
-                thread: event.prURL
+                thread: event.prURL,
+                sound: sound
             )
         }
     }
 
-    func sendUpdated(to version: String, notesURL: String) {
+    func sendUpdated(to version: String, notesURL: String, sound: Bool) {
         send(
             id: "updated-\(version)",
             title: "Pullse updated to \(version)",
             subtitle: nil,
             body: "Click to see what's new.",
             url: notesURL,
-            thread: "updates"
+            thread: "updates",
+            sound: sound
         )
     }
 
-    func sendTest(_ event: PREvent) {
+    func sendTest(_ event: PREvent, sound: Bool) {
         send(
             id: event.id,
             title: "Pullse is working",
             subtitle: nil,
             body: event.snippet,
             url: event.url,
-            thread: "test"
+            thread: "test",
+            sound: sound
         )
     }
 
@@ -94,24 +98,27 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate, @unchecked Sen
     }
 
     private func send(
-        id: String, title: String, subtitle: String?, body: String, url: String, thread: String
+        id: String, title: String, subtitle: String?, body: String, url: String, thread: String,
+        sound: Bool
     ) {
         let content = UNMutableNotificationContent()
         content.title = title
         if let subtitle { content.subtitle = subtitle }
         content.body = body
-        content.sound = .default
+        content.sound = sound ? .default : nil
         content.threadIdentifier = thread
         content.userInfo = ["url": url]
         center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 
-    // Show banners even while the app is "frontmost" (e.g. the popover is open).
+    // Show banners even while the app is "frontmost" (e.g. the popover is open), with a
+    // sound only when the notification was posted with one.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .list, .sound])
+        let sound: UNNotificationPresentationOptions = notification.request.content.sound == nil ? [] : .sound
+        completionHandler([.banner, .list, sound])
     }
 
     func userNotificationCenter(

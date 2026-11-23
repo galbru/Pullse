@@ -196,6 +196,7 @@ struct SettingsView: View {
         }
 
         Section {
+            Toggle("Play a sound", isOn: settings.binding(\.playSound))
             Button { Task { await sendTest() } } label: {
                 // Both labels are always laid out, so the button keeps one width when it swaps.
                 ZStack {
@@ -207,8 +208,10 @@ struct SettingsView: View {
                 }
             }
             .disabled(testSent.wrappedValue)
+        } header: {
+            Text("Delivery")
         } footer: {
-            Footnote("Posts a sample notification and adds a test item to the activity list.")
+            Footnote("Without a sound, notifications still show as banners and in Notification Center. The test posts a sample notification and adds a test item to the activity list.")
         }
     }
 

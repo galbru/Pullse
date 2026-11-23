@@ -43,6 +43,7 @@ private func write(_ text: String, to file: SettingsFile) throws {
     settings.includeBots = true
     settings.mutedRepos = ["sandbox", "acme/legacy"]
     settings.ignoreDrafts = true
+    settings.playSound = false
     settings.bundleIdentifier = "com.example.test"
     try file.save(settings)  // creates the missing directories
     #expect(try file.load() == settings)
@@ -69,6 +70,7 @@ private func write(_ text: String, to file: SettingsFile) throws {
     #expect(settings.notifyComments)
     #expect(settings.pollSeconds == 60)
     #expect(settings.ciResults == .failuresOnly)
+    #expect(settings.playSound)
 }
 
 @Test func unknownKeysAreIgnored() throws {

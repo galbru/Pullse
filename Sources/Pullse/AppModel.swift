@@ -115,7 +115,9 @@ final class AppModel {
               settings.current.notifyAfterUpdate
         else { return }
         let notes = updater.repository.map { "https://github.com/\($0)/releases/tag/v\(current)" }
-        notifier.sendUpdated(to: current, notesURL: notes ?? "https://github.com")
+        notifier.sendUpdated(
+            to: current, notesURL: notes ?? "https://github.com", sound: settings.current.playSound
+        )
     }
 
     /// Poll now and restart the timer (also picks up a changed interval).
@@ -185,7 +187,7 @@ final class AppModel {
             lastError = nil
             save()
             if !events.isEmpty {
-                notifier.post(events)
+                notifier.post(events, sound: self.settings.current.playSound)
             }
         } catch {
             lastError = error.localizedDescription
@@ -333,7 +335,7 @@ final class AppModel {
         state.record([event])
         history = state.history
         save()
-        notifier.sendTest(event)
+        notifier.sendTest(event, sound: settings.current.playSound)
     }
 
     /// Clears the activity, and the deploys that are approved; the ones still on their way

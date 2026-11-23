@@ -25,6 +25,9 @@ public struct PullseSettings: Codable, Equatable, Sendable {
     public var trackDeploys = true
     /// Notify when such a deploy starts waiting for approval and when it's approved.
     public var notifyDeploys = true
+    /// Notifications play the system sound. Off, they still show as banners and in
+    /// Notification Center, just silently, without muting the whole Mac.
+    public var playSound = true
     /// File only. The environments to follow by repository, `owner/name` or bare `name`, in
     /// place of the ones found by their required reviewers: `{"api": ["production"]}`.
     /// An empty list turns it off for that repository.
@@ -68,6 +71,7 @@ public struct PullseSettings: Codable, Equatable, Sendable {
         showOpenPullRequests = try c.decodeIfPresent(Bool.self, forKey: .showOpenPullRequests) ?? d.showOpenPullRequests
         trackDeploys = try c.decodeIfPresent(Bool.self, forKey: .trackDeploys) ?? d.trackDeploys
         notifyDeploys = try c.decodeIfPresent(Bool.self, forKey: .notifyDeploys) ?? d.notifyDeploys
+        playSound = try c.decodeIfPresent(Bool.self, forKey: .playSound) ?? d.playSound
         deployEnvironments = try c.decodeIfPresent([String: [String]].self, forKey: .deployEnvironments) ?? d.deployEnvironments
         // A hand-edited shortcut that doesn't decode is treated as none, not as a broken file.
         openMenuShortcut = (try? c.decodeIfPresent(HotKey.self, forKey: .openMenuShortcut)) ?? nil

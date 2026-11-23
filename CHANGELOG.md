@@ -8,6 +8,11 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Added
+- A "Play a sound" switch in Settings → Notifications. Turned off, notifications still
+  show as banners and in Notification Center, just without a sound, so Pullse can be quiet
+  without muting the whole Mac.
+
 ## [0.15.0] - 2026-11-23
 
 ### Added

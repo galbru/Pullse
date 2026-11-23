@@ -154,7 +154,7 @@ The Settings window has a tab for each area, listed down the left side:
 | Tab | What's on it |
 | --- | --- |
 | **GitHub** | the organization to watch, how often to check, and the result of the last check |
-| **Notifications** | which events notify, the CI results mode, filters (bots, muted repositories), and a test notification. A warning appears here when macOS isn't showing Pullse's notifications |
+| **Notifications** | which events notify, the CI results mode, filters (bots, muted repositories), whether notifications play a sound, and a test notification. A warning appears here when macOS isn't showing Pullse's notifications |
 | **Updates** | the running version, Check now, and the automatic update toggles |
 | **App** | Launch at login, and where the settings file lives |
 
@@ -180,6 +180,7 @@ edits it, and changes made by hand are picked up on the next check.
   "showOpenPullRequests": true,
   "trackDeploys": true,
   "notifyDeploys": true,
+  "playSound": true,
   "deployEnvironments": { "your-org/api": ["production"], "sandbox": [] },
   "openMenuShortcut": { "keyCode": 35, "key": "P", "modifiers": ["control", "option"] },
   "checkForUpdates": true,
