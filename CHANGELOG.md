@@ -8,6 +8,8 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-11-24
+
 ### Fixed
 - Deploys of pull requests merged through the merge queue are followed again. Pullse took
   the queue's finished checks for the end of the merge's workflows and dropped the merge in
