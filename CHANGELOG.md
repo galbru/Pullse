@@ -8,6 +8,13 @@ Added, Changed, Deprecated or Removed is a minor, and Breaking is a major.
 
 ## [Unreleased]
 
+### Fixed
+- Deploys of pull requests merged through the merge queue are followed again. Pullse took
+  the queue's finished checks for the end of the merge's workflows and dropped the merge in
+  the seconds before its deploy started. Pull requests merged together, such as a stack,
+  now all follow the deploy of the top one, which is the only one GitHub runs the
+  workflows for.
+
 ## [0.16.0] - 2026-11-23
 
 ### Changed

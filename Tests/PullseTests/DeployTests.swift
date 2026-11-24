@@ -10,19 +10,29 @@ private func prURL(_ number: Int, repo: String = api) -> String {
     "https://github.com/\(repo)/pull/\(number)"
 }
 
-/// The merge commit of PR `number` is "c<number>", committed when it merged.
+/// The merge commit of PR `number` is "c<number>", committed when it merged unless
+/// `committed` says otherwise. `runs` start just after the merge; `queueRuns` are the merge
+/// queue's checks, run on the merge commit minutes before it.
 private func merged(
-    _ number: Int, repo: String = api, at date: Date = t0, runs: [String]? = ["IN_PROGRESS"]
+    _ number: Int, repo: String = api, at date: Date = t0, committed: Date? = nil,
+    runs: [String]? = ["IN_PROGRESS"], queueRuns: [String] = []
 ) -> [String: Any] {
-    [
+    func suite(_ status: String, _ id: String, created: Date) -> [String: Any] {
+        ["status": status, "app": ["slug": "github-actions"], "createdAt": stamp(created),
+         "workflowRun": ["url": "https://github.com/\(repo)/actions/runs/\(id)"]]
+    }
+    let queue = queueRuns.enumerated().map { index, status in
+        suite(status, "\(number)q\(index)", created: date.addingTimeInterval(-180))
+    }
+    let push = (runs ?? []).enumerated().map { index, status in
+        suite(status, "\(number)\(index)", created: date.addingTimeInterval(1))
+    }
+    return [
         "id": "PR_\(number)", "number": number, "title": "Change \(number)", "url": prURL(number, repo: repo),
         "mergedAt": stamp(date), "repository": ["nameWithOwner": repo],
         "mergeCommit": [
-            "oid": "c\(number)", "committedDate": stamp(date),
-            "checkSuites": ["nodes": (runs ?? []).enumerated().map { index, status in
-                ["status": status, "app": ["slug": "github-actions"],
-                 "workflowRun": ["url": "https://github.com/\(repo)/actions/runs/\(number)\(index)"]]
-            }],
+            "oid": "c\(number)", "committedDate": stamp(committed ?? date),
+            "checkSuites": ["nodes": queue + push],
         ],
     ]
 }
@@ -294,4 +304,62 @@ private func track(
     #expect(groups[1].link == "https://github.com/\(api)/actions/runs/1")
     #expect(groups[2].link == "https://github.com/\(api)/actions/runs/50")
     #expect(groups[0].link == prURL(1))
+}
+
+// MARK: - The merge queue
+
+/// Through the merge queue the merge commit's checks run and finish before the merge, and
+/// the push workflows (the deploy among them) start only after it.
+@Test func theMergeQueuesFinishedChecksDontEndAMerge() throws {
+    let merge = merged(1, at: now, runs: [], queueRuns: ["COMPLETED", "COMPLETED"])
+    var (watches, _) = track(try deploySnapshot(merged: [merge]))
+    #expect(watches.map(\.phase) == [.pending])
+
+    let pushed = merged(1, at: now, runs: ["IN_PROGRESS"], queueRuns: ["COMPLETED", "COMPLETED"])
+    (watches, _) = track(watches, try deploySnapshot(merged: [pushed]), at: now.addingTimeInterval(60))
+    #expect(watches.map(\.phase) == [.pending])
+    #expect(watches.first?.link == "https://github.com/\(api)/actions/runs/10")
+
+    // Still nothing after the push: no deploy is coming.
+    let never = merged(1, at: now, runs: [], queueRuns: ["COMPLETED"])
+    (watches, _) = track(watches, try deploySnapshot(merged: [never]), at: now.addingTimeInterval(16 * 60))
+    #expect(watches.isEmpty)
+}
+
+/// A stack merged through the queue lands in one push: only the top pull request's commit
+/// gets the push workflows, and its deploy carries the ones below.
+@Test func aStackMergedTogetherFollowsItsTopDeploy() throws {
+    let start = now
+    func stack(_ deployments: [[String: Any]] = []) throws -> DeploySnapshot {
+        try deploySnapshot(
+            merged: [
+                merged(2, at: start, runs: ["IN_PROGRESS"], queueRuns: ["COMPLETED"]),
+                merged(1, at: start, committed: start.addingTimeInterval(-1), runs: [], queueRuns: ["COMPLETED"]),
+            ],
+            repositories: [api: repository(deployments: deployments)]
+        )
+    }
+    var (watches, events) = track(try stack())
+    #expect(watches.map(\.number) == [2, 1])
+    #expect(watches.map(\.phase) == [.pending, .pending])
+    #expect(watches.map(\.link) == Array(repeating: "https://github.com/\(api)/actions/runs/20", count: 2))
+
+    (watches, events) = track(
+        watches, try stack([deployment("c2", "WAITING", committed: start)]), at: start.addingTimeInterval(60)
+    )
+    #expect(watches.map(\.phase) == [.waiting, .waiting])
+    #expect(events.count == 2)
+
+    (watches, _) = track(
+        watches, try stack([deployment("c2", "IN_PROGRESS", committed: start)]), at: start.addingTimeInterval(20 * 60)
+    )
+    #expect(watches.map(\.phase) == [.approved, .approved])
+    #expect(watches.map(\.coveredBy) == [nil, "c2"])
+}
+
+@Test func mergesMinutesApartArentOnePush() throws {
+    let later = merged(2, at: now, runs: ["IN_PROGRESS"])
+    let earlier = merged(1, at: now.addingTimeInterval(-5 * 60), runs: [], queueRuns: ["COMPLETED"])
+    let (watches, _) = track(try deploySnapshot(merged: [later, earlier]), at: now.addingTimeInterval(11 * 60))
+    #expect(watches.map(\.number) == [2])
 }

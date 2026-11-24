@@ -91,7 +91,7 @@ enum Queries {
             repository { nameWithOwner }
             mergeCommit {
               oid committedDate
-              checkSuites(first: 30) { nodes { status app { slug } workflowRun { url } } }
+              checkSuites(first: 30) { nodes { status createdAt app { slug } workflowRun { url } } }
             }
           }
         }

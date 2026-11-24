@@ -16,6 +16,7 @@ public struct MergedPullRequest: Decodable, Sendable {
         public let status: String?
         public let app: App?
         public var workflowRun: WorkflowRun? = nil
+        public var createdAt: Date? = nil
     }
 
     public struct MergeCommit: Decodable, Sendable {
@@ -32,9 +33,9 @@ public struct MergedPullRequest: Decodable, Sendable {
     public let repository: Repository
     public let mergeCommit: MergeCommit?
 
-    /// Whether every GitHub Actions run on the merge commit has finished; nil when there
-    /// are none (yet). Only Actions runs count: an environment approval is an Actions
-    /// feature, and other apps can leave a suite queued forever.
+    /// Whether every GitHub Actions run on the merge commit since the merge has finished;
+    /// nil when there are none (yet). Only Actions runs count: an environment approval is
+    /// an Actions feature, and other apps can leave a suite queued forever.
     public var workflowsFinished: Bool? {
         let suites = actionsSuites
         guard !suites.isEmpty else { return nil }
@@ -49,9 +50,21 @@ public struct MergedPullRequest: Decodable, Sendable {
         return running.lazy.compactMap { GitHubLink.safe($0.workflowRun?.url) }.first
     }
 
+    /// Its Actions runs since the merge. Through the merge queue the merge commit exists,
+    /// and its merge group checks run and finish, minutes before the merge; counting them
+    /// made a merge look finished in the seconds before its push workflows (the deploy
+    /// among them) started.
     private var actionsSuites: [CheckSuite] {
-        mergeCommit?.checkSuites?.items.filter { $0.app?.slug == "github-actions" } ?? []
+        let since = mergedAt?.addingTimeInterval(-Self.clockSlack)
+        return mergeCommit?.checkSuites?.items.filter { suite in
+            guard suite.app?.slug == "github-actions" else { return false }
+            guard let since, let created = suite.createdAt else { return true }
+            return created >= since
+        } ?? []
     }
+
+    /// GitHub stamps the merge and the push's runs separately.
+    static let clockSlack: TimeInterval = 2
 }
 
 /// A repository's environments and newest deployments, from `Queries.repositoryDeployments`.
@@ -208,7 +221,9 @@ public enum DeployTracker {
     /// either, stops being followed after this long.
     static let pendingLimit: TimeInterval = 24 * 60 * 60
     /// With no Actions run on the merge commit after this long, none is coming.
-    static let noRunsLimit: TimeInterval = 15 * 60
+    public static let noRunsLimit: TimeInterval = 15 * 60
+    /// Pull requests merged within this of each other count as merged together.
+    static let batchWindow: TimeInterval = 60
     /// GitHub gives up on an unapproved deployment after 30 days.
     static let waitingLimit: TimeInterval = 30 * 24 * 60 * 60
     /// How long a cleared deploy is remembered, so it isn't found again. Must exceed
@@ -253,7 +268,10 @@ public enum DeployTracker {
             }
             guard repository.gatedEnvironments(override: settings.deployEnvironments(for: watch.repo))
                 .contains(where: { same($0, watch.environment) }),
-                let found = resolve(watch, in: repository, pr: merged[watch.prURL], now: now)
+                let found = resolve(
+                    watch, in: repository, pr: merged[watch.prURL],
+                    carrier: merged[watch.prURL].flatMap { carrier(of: $0, among: snapshot.merged) }, now: now
+                )
             else { continue }
             watch.link = found.link ?? watch.link
             if found.phase != watch.phase {
@@ -282,7 +300,7 @@ public enum DeployTracker {
                     mergedAt: mergedAt, phase: .pending, changedAt: now
                 )
                 guard !followed.contains(watch.id),
-                      let found = resolve(watch, in: repository, pr: pr, now: now)
+                      let found = resolve(watch, in: repository, pr: pr, carrier: carrier(of: pr, among: snapshot.merged), now: now)
                 else { continue }
                 let recent = mergedAt >= cutoff
                 // Already out before Pullse looked: nothing to follow.
@@ -300,7 +318,8 @@ public enum DeployTracker {
     /// Where one deploy stands; nil when it will never need approval (its workflow ended
     /// without reaching the environment, or the deployment was rejected or failed).
     static func resolve(
-        _ watch: DeployWatch, in repository: RepositoryDeployments, pr: MergedPullRequest?, now: Date
+        _ watch: DeployWatch, in repository: RepositoryDeployments, pr: MergedPullRequest?,
+        carrier: MergedPullRequest? = nil, now: Date
     ) -> (phase: DeployWatch.Phase, coveredBy: String?, link: String?)? {
         let deployments = repository.deployments.items.filter {
             $0.environment.map { same($0, watch.environment) } == true
@@ -321,11 +340,37 @@ public enum DeployTracker {
             return (.waiting, nil, own.link)
         }
         let age = now.timeIntervalSince(watch.mergedAt)
-        switch pr?.workflowsFinished {
-        case true?: return nil
-        case nil where pr != nil && age > noRunsLimit: return nil
-        default: return age > pendingLimit ? nil : (.pending, nil, pr?.runLink)
+        // With no runs of its own, a merge carried by a newer one goes out with its deploy.
+        var runs = pr
+        if pr?.workflowsFinished == nil, let carrier, let commit = carrier.mergeCommit?.oid {
+            if let carried = deployments.first(where: { $0.commitOid == commit }) {
+                if carried.succeeded || carried.approved { return (.approved, String(commit.prefix(7)), carried.link) }
+                guard carried.waiting, age < waitingLimit else { return nil }
+                return (.waiting, nil, carried.link)
+            }
+            runs = carrier
         }
+        switch runs?.workflowsFinished {
+        case true?: return nil
+        case nil where runs != nil && age > noRunsLimit: return nil
+        default: return age > pendingLimit ? nil : (.pending, nil, runs?.runLink)
+        }
+    }
+
+    /// The newest merge in the same push as `pr`, when that isn't `pr` itself. Pull
+    /// requests merged together (a stack through the merge queue) land in one push, and
+    /// only its newest commit gets the push's workflows, the deploy among them.
+    static func carrier(of pr: MergedPullRequest, among merged: [MergedPullRequest]) -> MergedPullRequest? {
+        guard let mergedAt = pr.mergedAt else { return nil }
+        func key(_ pr: MergedPullRequest) -> (Date, Int) {
+            (pr.mergeCommit?.committedDate ?? .distantPast, pr.number)
+        }
+        let batch = merged.filter { other in
+            other.repository.nameWithOwner == pr.repository.nameWithOwner && other.mergeCommit != nil
+                && abs((other.mergedAt ?? .distantPast).timeIntervalSince(mergedAt)) <= batchWindow
+        }
+        guard let newest = batch.max(by: { key($0) < key($1) }), newest.url != pr.url else { return nil }
+        return newest
     }
 
     /// Short enough for one line in the menu; `snippet` says the rest.
