@@ -218,8 +218,11 @@ final class AppModel {
         // A merge read once and not followed has nothing to wait for: its repository has no
         // gated environment, or it was out before Pullse looked.
         let followed = Set(watches.map(\.prURL))
+        // Only once its runs have had time to start: a merge looked at in the seconds before
+        // they do would be decided too early and never looked at again.
+        let settledBefore = now.addingTimeInterval(-DeployTracker.noRunsLimit)
         for pr in snapshot.merged where snapshot.repositories[pr.repository.nameWithOwner] != nil
-            && !followed.contains(pr.url) {
+            && !followed.contains(pr.url) && (pr.mergedAt ?? .distantPast) < settledBefore {
             decidedWithoutDeploy.insert(pr.url)
         }
         return events

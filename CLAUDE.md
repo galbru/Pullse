@@ -91,7 +91,13 @@ Two targets. `PullseCore` has no AppKit or SwiftUI and holds all the logic under
    waiting (red) while it's WAITING, approved (green) once approved or once a later commit
    (by commit date, since the deploy branch only moves forward) succeeded there. A merge
    whose Actions runs all finish without reaching the environment is dropped, which is
-   what keeps repositories with other CI from getting stuck orange rows. Watches are saved
+   what keeps repositories with other CI from getting stuck orange rows. Only runs created
+   since the merge count: through the merge queue the merge commit's merge-group checks
+   finish before the merge. Pull requests merged within a minute of each other in one
+   repository (a stack through the queue) share one push, whose workflows run only on its
+   newest commit, so the others follow that commit's deploy (`DeployTracker.carrier`).
+   `AppModel` only stops reading a merge it didn't follow once it is 15 minutes old.
+   Watches are saved
    in `state.json`; Clear marks approved ones cleared.
 
 **What counts as new** is the heart of the app (`EventDetector`). An item notifies only if
